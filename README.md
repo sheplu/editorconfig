@@ -3,7 +3,7 @@
 A small CLI to manage a **consistent `.editorconfig`** across your projects.
 
 - ✅ Generate a sane default `.editorconfig` in seconds
-- 🔜 Check if your existing file matches the target setup
+- ✅ Check if your existing file matches the target setup
 - 🔜 Propose updates (with confirmation) instead of blindly overwriting
 - 🔜 Compare your file against the recommended template
 
