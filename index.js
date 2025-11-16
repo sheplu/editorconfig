@@ -7,7 +7,7 @@ export async function createEditorConfig(path = '.editorconfig') {
 };
 
 async function main() {
-	await createEditorConfig('tets');
+	await createEditorConfig();
 };
 
 await main();
