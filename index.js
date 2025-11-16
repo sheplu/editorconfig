@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 
 const editorconfigContent = `root = true
 
@@ -21,8 +21,18 @@ export function createEditorConfig(path = '.editorconfig') {
 	writeFileSync(path, editorconfigContent, 'utf8');
 };
 
+export function compareEditorConfig(path = '.editorconfig') {
+	const file = readFileSync(path).toString();
+	if(editorconfigContent === file) {
+		console.log('✅ Editorconfig is matching the expected configuration')
+	}
+	else {
+		console.log('❌ Editorconfig is not matching the expected configuration');
+	}
+};
+
 function main() {
-	createEditorConfig();
+	readEditorConfig();
 };
 
 main();
