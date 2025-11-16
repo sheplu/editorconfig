@@ -22,7 +22,7 @@ This CLI aims to provide a **single source of truth** for your preferred `.edito
 You can use it **without installing**, via `npx`:
 
 ```bash
-npx @sheplu/editorconfig
+npx @sheplu/editorconfig --mode=write
 ```
 
 Or install it globally:
@@ -43,7 +43,7 @@ npm install -D @sheplu/editorconfig
 From the root of your project:
 
 ```bash
-npx @sheplu/editorconfig
+npx @sheplu/editorconfig --mode=write
 ```
 
 This will:
@@ -54,10 +54,10 @@ This will:
 
 ## Current Features
 
-### `init`
+### `write`
 
 ```bash
-npx @sheplu/editorconfig
+npx @sheplu/editorconfig --mode=write
 ```
 
 Creates a base `.editorconfig` file in the current directory.
@@ -80,29 +80,38 @@ quote_type = single
 spaces_around_operators = true
 ```
 
+### `check`
+
+```bash
+npx @sheplu/editorconfig --mode=check
+```
+
+Validates your existing `.editorconfig` and reports any drift from the target configuration.
+
+This command will:
+
+- Read your existing .editorconfig
+- Compare it against the tool’s canonical template
+- Exit with:
+  - `0` if everything matches
+  - `1` if differences are found
+
 ## Planned / Upcoming Features
 
-### 1. Check current `.editorconfig`
+### 1. Interactive update / replace
 
 ```bash
-npx @sheplu/editorconfig check
+npx @sheplu/editorconfig --mode=fix
 ```
 
-### 2. Interactive update / replace
+### 2. Compare with target setup
 
 ```bash
-npx @sheplu/editorconfig fix
-```
-
-### 3. Compare with target setup
-
-```bash
-npx @sheplu/editorconfig diff
+npx @sheplu/editorconfig --mode=diff
 ```
 
 ## Roadmap
 
-- [ ] Add `check` command
 - [ ] Add diff logic and `diff` command
 - [ ] Add interactive `fix` / `update` command
 - [ ] Expose presets or configuration options
