@@ -1,24 +1,24 @@
 {
-  "name": "@sheplu/editorconfig",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
+	"name": "@sheplu/editorconfig",
+	"version": "1.0.0",
+	"description": "",
+	"main": "index.js",
+	"scripts": {
+		"test": "echo \"Error: no test specified\" && exit 1"
+	},
 	"bin": {
-    "@sheplu/editorconfig": "index.js"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/sheplu/editorconfig.git"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "module",
-  "bugs": {
-    "url": "https://github.com/sheplu/editorconfig/issues"
-  },
-  "homepage": "https://github.com/sheplu/editorconfig#readme"
+		"@sheplu/editorconfig": "index.js"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/sheplu/editorconfig.git"
+	},
+	"keywords": [],
+	"author": "",
+	"license": "MIT",
+	"type": "module",
+	"bugs": {
+		"url": "https://github.com/sheplu/editorconfig/issues"
+	},
+	"homepage": "https://github.com/sheplu/editorconfig#readme"
 }
