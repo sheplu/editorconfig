@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { readFileSync, writeFileSync } from "node:fs";
+import { parseArgs } from 'node:util';
 
 const editorconfigContent = `root = true
 
@@ -23,7 +24,7 @@ export function createEditorConfig(path = '.editorconfig') {
 
 export function compareEditorConfig(path = '.editorconfig') {
 	const file = readFileSync(path).toString();
-	if(editorconfigContent === file) {
+	if (editorconfigContent === file) {
 		console.log('✅ Editorconfig is matching the expected configuration')
 	}
 	else {
@@ -32,7 +33,28 @@ export function compareEditorConfig(path = '.editorconfig') {
 };
 
 function main() {
-	readEditorConfig();
+	const args = process.argv.slice(2);
+	const options = {
+		mode: {
+			type: 'string',
+			short: 'm',
+		},
+		path: {
+			type: 'string',
+			short: 'p',
+		},
+	};
+	const { values } = parseArgs({ args, options });
+	const path = values.path || '.editorconfig'
+	if (values.mode === 'write') {
+		createEditorConfig(path);
+	}
+	else if (values.mode === 'check') {
+		compareEditorConfig(path);
+	}
+	else {
+		console.error('invalide commande');
+	}
 };
 
 main();
