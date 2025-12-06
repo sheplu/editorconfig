@@ -16,7 +16,6 @@ trim_trailing_whitespace = true
 insert_final_newline = true
 quote_type = single
 spaces_around_operators = true
-
 `;
 
 export function createEditorConfig(path = '.editorconfig') {
