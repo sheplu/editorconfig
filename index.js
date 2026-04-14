@@ -53,7 +53,7 @@ function main() {
 		compareEditorConfig(path);
 	}
 	else {
-		console.error('invalide commande');
+		console.error('invalid commande');
 	}
 };
 
