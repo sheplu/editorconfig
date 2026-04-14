@@ -118,3 +118,7 @@ npx @sheplu/editorconfig --mode=diff
 - [ ] Add tests and CI examples
 
 Additional properties can be found on the [editorconfig wiki](https://github.com/editorconfig/editorconfig/wiki/editorconfig-properties).
+
+## Documentation
+
+[Editorconfig documentation](https://github.com/editorconfig/editorconfig/wiki/editorconfig-properties)
