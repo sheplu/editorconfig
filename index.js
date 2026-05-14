@@ -2,6 +2,7 @@
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { parseArgs } from 'node:util';
+import { fileURLToPath } from 'node:url';
 
 const editorconfigContent = `root = true
 
@@ -32,19 +33,41 @@ export function compareEditorConfig(path = '.editorconfig') {
 	}
 };
 
+export const options = {
+	mode: {
+		type: 'string',
+		short: 'm',
+	},
+	path: {
+		type: 'string',
+		short: 'p',
+	},
+	help: {
+		type: 'boolean',
+		short: 'h',
+	},
+};
+
+export function printHelp() {
+	console.log(`Usage: editorconfig --mode=<command> [--path=<path>]
+
+Commands:
+  write    Create a .editorconfig file with the default template
+  check    Compare an existing .editorconfig against the template
+
+Options:
+  -m, --mode   Command to run (write | check)
+  -p, --path   Path to the .editorconfig file (default: .editorconfig)
+  -h, --help   Show this help message`);
+};
+
 function main() {
 	const args = process.argv.slice(2);
-	const options = {
-		mode: {
-			type: 'string',
-			short: 'm',
-		},
-		path: {
-			type: 'string',
-			short: 'p',
-		},
-	};
 	const { values } = parseArgs({ args, options });
+	if (values.help) {
+		printHelp();
+		return;
+	}
 	const path = values.path || '.editorconfig'
 	if (values.mode === 'write') {
 		createEditorConfig(path);
@@ -57,4 +80,6 @@ function main() {
 	}
 };
 
-main();
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+	main();
+}
