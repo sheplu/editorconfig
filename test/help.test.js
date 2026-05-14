@@ -18,13 +18,13 @@ function captureHelp() {
 
 describe('printHelp', () => {
 	it('output starts with a Usage line', () => {
-		assert.match(captureHelp(), /Usage:/);
+		assert.match(captureHelp(), /Usage:/u);
 	});
 
 	it('lists every supported command', () => {
 		const output = captureHelp();
 		for (const command of SUPPORTED_COMMANDS) {
-			assert.match(output, new RegExp(`\\b${command}\\b`), `expected help output to mention command "${command}"`);
+			assert.match(output, new RegExp(`\\b${command}\\b`, 'u'), `expected help output to mention command "${command}"`);
 		}
 	});
 
