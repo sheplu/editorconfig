@@ -2,7 +2,6 @@
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { parseArgs } from 'node:util';
-import { fileURLToPath } from 'node:url';
 
 const editorconfigContent = `root = true
 
@@ -80,6 +79,6 @@ function main() {
 	}
 };
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (process.argv[1] === import.meta.filename) {
 	main();
 }

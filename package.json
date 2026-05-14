@@ -4,6 +4,7 @@
 	"description": "",
 	"main": "index.js",
 	"scripts": {
+		"lint": "oxlint",
 		"test": "node --test"
 	},
 	"bin": {
@@ -27,5 +28,8 @@
 	"bugs": {
 		"url": "https://github.com/sheplu/editorconfig/issues"
 	},
-	"homepage": "https://github.com/sheplu/editorconfig#readme"
+	"homepage": "https://github.com/sheplu/editorconfig#readme",
+	"devDependencies": {
+		"oxlint": "^1.64.0"
+	}
 }
