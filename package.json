@@ -5,7 +5,9 @@
 	"main": "index.js",
 	"scripts": {
 		"lint": "oxlint",
-		"test": "node --test"
+		"test": "node --test",
+		"test:unit": "node --test 'test/unit/*.test.js'",
+		"test:integration": "node --test 'test/integration/*.test.js'"
 	},
 	"bin": {
 		"@sheplu/editorconfig": "index.js"
@@ -30,6 +32,7 @@
 	},
 	"homepage": "https://github.com/sheplu/editorconfig#readme",
 	"devDependencies": {
+		"node-pty": "1.0.0",
 		"oxlint": "^1.64.0"
 	}
 }
