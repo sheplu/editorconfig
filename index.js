@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { createInterface } from 'node:readline';
 import { parseArgs } from 'node:util';
 
 const editorconfigContent = `root = true
@@ -45,6 +46,10 @@ export const options = {
 		type: 'boolean',
 		short: 'h',
 	},
+	overwrite: {
+		type: 'boolean',
+		short: 'o',
+	},
 };
 
 export function printHelp() {
@@ -55,10 +60,33 @@ Commands:
   check    Compare an existing .editorconfig against the template
 
 Options:
-  -m, --mode   Command to run (write | check)
-  -p, --path   Path to the .editorconfig file (default: .editorconfig)
-  -h, --help   Show this help message`);
+  -m, --mode       Command to run (write | check)
+  -p, --path       Path to the .editorconfig file (default: .editorconfig)
+  -o, --overwrite  Overwrite an existing .editorconfig without confirmation
+  -h, --help       Show this help message`);
 };
+
+function runWrite(path, overwrite) {
+	if (!existsSync(path) || overwrite) {
+		createEditorConfig(path);
+		return;
+	}
+	if (!process.stdin.isTTY) {
+		console.error(`\`${path}\` already exists. Use --overwrite to replace it.`);
+		process.exitCode = 1;
+		return;
+	}
+	const rl = createInterface({ input: process.stdin, output: process.stdout });
+	rl.question(`\`${path}\` already exists. Overwrite? [y/N] `, (answer) => {
+		rl.close();
+		if (/^y(es)?$/iu.test(answer.trim())) {
+			createEditorConfig(path);
+		}
+		else {
+			console.log(`Skipped: \`${path}\` was not modified.`);
+		}
+	});
+}
 
 function main() {
 	const args = process.argv.slice(2);
@@ -69,7 +97,7 @@ function main() {
 	}
 	const path = values.path || '.editorconfig'
 	if (values.mode === 'write') {
-		createEditorConfig(path);
+		runWrite(path, values.overwrite);
 	}
 	else if (values.mode === 'check') {
 		compareEditorConfig(path);

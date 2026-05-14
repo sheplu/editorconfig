@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { printHelp, options } from '../index.js';
+import { printHelp, options } from '../../index.js';
 
 const SUPPORTED_COMMANDS = ['write', 'check'];
 
