@@ -1,0 +1,5 @@
+export const markdown = `[*.md]
+indent_style = space
+indent_size = 2
+trim_trailing_whitespace = false
+`;

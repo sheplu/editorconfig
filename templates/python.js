@@ -1,0 +1,5 @@
+export const python = `[*.py]
+indent_style = space
+indent_size = 4
+max_line_length = 88
+`;
