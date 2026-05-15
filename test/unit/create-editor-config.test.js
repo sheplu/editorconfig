@@ -20,7 +20,21 @@ describe('createEditorConfig', () => {
 	it('writes the template to the given path', () => {
 		createEditorConfig(state.target);
 		assert.ok(existsSync(state.target), 'expected file to be created');
-		assert.match(readFileSync(state.target, 'utf8'), /^root = true/u);
+		const content = readFileSync(state.target, 'utf8');
+		assert.match(content, /^root = true/u);
+	});
+
+	it('includes a language section when one is requested', () => {
+		createEditorConfig(state.target, ['markdown']);
+		const content = readFileSync(state.target, 'utf8');
+		assert.match(content, /\[\*\.md\]/u);
+	});
+
+	it('writes base only when no languages are requested', () => {
+		createEditorConfig(state.target);
+		const content = readFileSync(state.target, 'utf8');
+		assert.doesNotMatch(content, /\[\*\.md\]/u);
+		assert.doesNotMatch(content, /\[\*\.py\]/u);
 	});
 
 	it('overwrites an existing file when called directly', () => {

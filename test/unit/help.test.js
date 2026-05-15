@@ -32,6 +32,7 @@ describe('printHelp', () => {
 		const output = captureHelp();
 		for (const [name, { short }] of Object.entries(options)) {
 			assert.ok(output.includes(`--${name}`), `expected help output to mention --${name}`);
+			assert.ok(short, `expected option "${name}" to define a short form`);
 			assert.ok(output.includes(`-${short}`), `expected help output to mention -${short}`);
 		}
 	});

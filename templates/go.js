@@ -1,0 +1,5 @@
+export const go = `[*.go]
+indent_style = tab
+indent_size = 4
+tab_width = 4
+`;

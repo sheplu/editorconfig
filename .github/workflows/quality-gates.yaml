@@ -99,3 +99,26 @@ jobs:
 
       - name: Run tests
         run: npm test
+
+  self-check:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 1
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 24
+          registry-url: "https://registry.npmjs.org"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate the project's own .editorconfig
+        run: node index.js --mode=check
