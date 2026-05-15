@@ -9,7 +9,7 @@ import {
 	parseSection,
 	parseSections,
 	resolveLanguageNames,
-} from '../../templates/index.js';
+} from '../../src/templates/index.js';
 
 describe('parseSection', () => {
 	it('parses key=value lines into a Map', () => {
@@ -229,6 +229,33 @@ describe('expectedBodyForLanguage', () => {
 
 	it('returns the parsed body for a language template', () => {
 		const body = expectedBodyForLanguage('markdown');
+		assert.equal(body.get('indent_style'), 'space');
+		assert.equal(body.get('indent_size'), '2');
+		assert.equal(body.get('trim_trailing_whitespace'), 'false');
+	});
+
+	it('returns the override body when overrides define the language', () => {
+		const overrides = {
+			bodies: new Map([
+				['javascript', new Map([['indent_style', 'space'], ['indent_size', '2']])],
+			]),
+			rawSections: new Map(),
+			hasRoot: false,
+		};
+		const body = expectedBodyForLanguage('javascript', overrides);
+		assert.equal(body.get('indent_style'), 'space');
+		assert.equal(body.get('indent_size'), '2');
+	});
+
+	it('falls back to the built-in body when overrides do not define the language', () => {
+		const overrides = {
+			bodies: new Map([
+				['javascript', new Map([['indent_style', 'space']])],
+			]),
+			rawSections: new Map(),
+			hasRoot: false,
+		};
+		const body = expectedBodyForLanguage('markdown', overrides);
 		assert.equal(body.get('indent_style'), 'space');
 		assert.equal(body.get('indent_size'), '2');
 		assert.equal(body.get('trim_trailing_whitespace'), 'false');

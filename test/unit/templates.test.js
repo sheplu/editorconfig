@@ -1,12 +1,12 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import * as templates from '../../templates/index.js';
+import * as templates from '../../src/templates/index.js';
 import {
 	ALIASES,
 	AVAILABLE_LANGUAGES,
 	composeEditorConfig,
 	editorconfigContent,
-} from '../../templates/index.js';
+} from '../../src/templates/index.js';
 
 const TEMPLATES = [
 	{ name: 'base', header: '[*]' },
@@ -190,5 +190,44 @@ describe('composeEditorConfig — errors and identity', () => {
 
 	it('produces editorconfigContent when given AVAILABLE_LANGUAGES', () => {
 		assert.equal(composeEditorConfig(AVAILABLE_LANGUAGES), editorconfigContent);
+	});
+});
+
+describe('composeEditorConfig — overrides', () => {
+	it('emits the override section for base when present', () => {
+		const overrides = {
+			bodies: new Map(),
+			rawSections: new Map([
+				['base', 'root = true\n\n[*]\nindent_style = space\nindent_size = 2'],
+			]),
+			hasRoot: true,
+		};
+		const output = composeEditorConfig([], overrides);
+		assert.match(output, /^root = true\n\n\[\*\]\nindent_style = space\nindent_size = 2\n$/u);
+	});
+
+	it('falls back to the built-in section when overrides do not define it', () => {
+		const overrides = {
+			bodies: new Map(),
+			rawSections: new Map([
+				['base', 'root = true\n\n[*]\nindent_style = space\nindent_size = 2'],
+			]),
+			hasRoot: true,
+		};
+		const output = composeEditorConfig(['javascript'], overrides);
+		assert.match(output, /\[\*\.\{js,jsx,ts,tsx,mjs,cjs\}\]\nindent_style = tab\n/u);
+	});
+
+	it('emits override for one language and built-in for another in the same call', () => {
+		const overrides = {
+			bodies: new Map(),
+			rawSections: new Map([
+				['javascript', '[*.{js,jsx,ts,tsx,mjs,cjs}]\nindent_style = space\nindent_size = 2'],
+			]),
+			hasRoot: false,
+		};
+		const output = composeEditorConfig(['javascript', 'markdown'], overrides);
+		assert.match(output, /\[\*\.\{js,jsx,ts,tsx,mjs,cjs\}\]\nindent_style = space\nindent_size = 2\n/u);
+		assert.match(output, /\[\*\.md\]\nindent_style = space\n/u);
 	});
 });

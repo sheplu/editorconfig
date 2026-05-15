@@ -18,7 +18,8 @@
     "func-style": "off",
     "sort-imports": "off",
     "sort-keys": "off",
-    "no-magic-numbers": "off"
+    "no-magic-numbers": "off",
+    "no-async-await": "off"
   },
   "env": {
     "builtin": true

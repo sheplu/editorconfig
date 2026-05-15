@@ -7,13 +7,15 @@ import {
 	ALIASES,
 	AVAILABLE_LANGUAGES,
 	composeEditorConfig,
-} from './templates/index.js';
-import { compareEditorConfig, NO_LANGUAGE_FILTER, runCheck } from './check.js';
+	EMPTY_OVERRIDES,
+} from './src/templates/index.js';
+import { loadCustomTemplate } from './src/templates/custom-template.js';
+import { compareEditorConfig, NO_LANGUAGE_FILTER, runCheck } from './src/check.js';
 
 export { compareEditorConfig };
 
-export function createEditorConfig(path = '.editorconfig', languages = []) {
-	writeFileSync(path, composeEditorConfig(languages), 'utf8');
+export function createEditorConfig(path = '.editorconfig', languages = [], overrides = EMPTY_OVERRIDES) {
+	writeFileSync(path, composeEditorConfig(languages, overrides), 'utf8');
 };
 
 export const options = {
@@ -40,6 +42,10 @@ export const options = {
 	strict: {
 		type: 'boolean',
 		short: 's',
+	},
+	template: {
+		type: 'string',
+		short: 't',
 	},
 };
 
@@ -68,7 +74,7 @@ function formatAliasList() {
 }
 
 export function printHelp() {
-	console.log(`Usage: editorconfig --mode=<command> [--path=<path>] [--languages=<list>]
+	console.log(`Usage: editorconfig --mode=<command> [--path=<path>] [--languages=<list>] [--template=<path|url>]
 
 Commands:
   write    Create a .editorconfig file with the selected language sections
@@ -80,6 +86,7 @@ Options:
   -l, --languages  Comma-separated language sections (write: which to emit; check: required set)
   -o, --overwrite  Overwrite an existing .editorconfig without confirmation
   -s, --strict     Treat unknown section headers as failures (check only)
+  -t, --template   Path or https URL to a custom .editorconfig-syntax file whose sections override the built-in ones
   -h, --help       Show this help message
 
 Languages: ${AVAILABLE_LANGUAGES.join(', ')}
@@ -91,7 +98,10 @@ Examples:
   editorconfig --mode=write                       # interactive in TTY, base only otherwise
   editorconfig --mode=check                       # validate sections present in the file
   editorconfig --mode=check --languages=js,md    # require exactly base + js + md
-  editorconfig --mode=check --strict             # fail on any unknown section header`);
+  editorconfig --mode=check --strict             # fail on any unknown section header
+  editorconfig --mode=write --template=./team.editorconfig
+  editorconfig --mode=check --template=./team.editorconfig
+  editorconfig --mode=check --template=https://team.example.com/.editorconfig`);
 };
 
 function resolvePromptAnswer(answer) {
@@ -142,35 +152,37 @@ function confirmOverwrite(path) {
 	});
 }
 
-function runWrite(path, overwrite, parsedLanguages) {
-	return resolveLanguages(parsedLanguages).then((languages) => {
-		if (!existsSync(path) || overwrite) {
-			createEditorConfig(path, languages);
-			return;
-		}
-		if (!process.stdin.isTTY) {
-			console.error(`\`${path}\` already exists. Use --overwrite to replace it.`);
-			process.exitCode = 1;
-			return;
-		}
-		return confirmOverwrite(path).then((confirmed) => {
-			if (confirmed) {
-				createEditorConfig(path, languages);
-			}
-			else {
-				console.log(`Skipped: \`${path}\` was not modified.`);
-			}
-		});
-	});
+async function handleExistingTarget(path, languages, overrides) {
+	if (!process.stdin.isTTY) {
+		console.error(`\`${path}\` already exists. Use --overwrite to replace it.`);
+		process.exitCode = 1;
+		return;
+	}
+	const confirmed = await confirmOverwrite(path);
+	if (confirmed) {
+		createEditorConfig(path, languages, overrides);
+	}
+	else {
+		console.log(`Skipped: \`${path}\` was not modified.`);
+	}
 }
 
-function dispatchCheck(path, languages, strict) {
+async function runWrite({ path, overwrite, parsedLanguages, overrides }) {
+	const languages = await resolveLanguages(parsedLanguages);
+	if (!existsSync(path) || overwrite) {
+		createEditorConfig(path, languages, overrides);
+		return;
+	}
+	await handleExistingTarget(path, languages, overrides);
+}
+
+function dispatchCheck({ path, languages, strict, overrides }) {
 	let filter = languages;
 	if (filter === NOT_PROVIDED) {
 		filter = NO_LANGUAGE_FILTER;
 	}
 	try {
-		runCheck(path, filter, strict);
+		runCheck({ path, parsedLanguages: filter, strict, overrides });
 	}
 	catch (error) {
 		console.error(error.message);
@@ -178,15 +190,23 @@ function dispatchCheck(path, languages, strict) {
 	}
 }
 
-function runCommand({ mode, path, overwrite, languages, strict }) {
+async function dispatchWrite({ path, overwrite, languages, overrides }) {
+	try {
+		await runWrite({ path, overwrite, parsedLanguages: languages, overrides });
+	}
+	catch (error) {
+		console.error(error.message);
+		process.exitCode = 1;
+	}
+}
+
+async function runCommand({ mode, path, overwrite, languages, strict, overrides }) {
 	if (mode === 'write') {
-		return runWrite(path, overwrite, languages).catch((error) => {
-			console.error(error.message);
-			process.exitCode = 1;
-		});
+		await dispatchWrite({ path, overwrite, languages, overrides });
+		return;
 	}
 	if (mode === 'check') {
-		dispatchCheck(path, languages, strict);
+		dispatchCheck({ path, languages, strict, overrides });
 		return;
 	}
 	console.error('invalid command');
@@ -211,26 +231,55 @@ function parseCliArgs(args) {
 	}
 }
 
-function main() {
-	const args = process.argv.slice(2);
-	const parsed = parseCliArgs(args);
-	if (!parsed) {
+const OVERRIDES_FAILED = Symbol('overrides-failed');
+
+async function resolveOverrides(templateValue) {
+	if (typeof templateValue !== 'string') {
+		return EMPTY_OVERRIDES;
+	}
+	try {
+		return await loadCustomTemplate(templateValue);
+	}
+	catch (error) {
+		console.error(error.message);
+		process.exitCode = 1;
+		return OVERRIDES_FAILED;
+	}
+}
+
+async function dispatchValues(values) {
+	const overrides = await resolveOverrides(values.template);
+	if (overrides === OVERRIDES_FAILED) {
 		return;
 	}
-	const { values } = parsed;
-	if (values.help) {
-		printHelp();
-		return;
-	}
-	runCommand({
+	await runCommand({
 		mode: values.mode,
 		path: values.path || '.editorconfig',
 		overwrite: values.overwrite,
 		languages: parseLanguages(values.languages),
 		strict: values.strict,
+		overrides,
 	});
+}
+
+async function main() {
+	const parsed = parseCliArgs(process.argv.slice(2));
+	if (!parsed) {
+		return;
+	}
+	if (parsed.values.help) {
+		printHelp();
+		return;
+	}
+	await dispatchValues(parsed.values);
 };
 
 if (process.argv[1] === import.meta.filename) {
-	main();
+	try {
+		await main();
+	}
+	catch (error) {
+		console.error(error.message);
+		process.exitCode = 1;
+	}
 }
