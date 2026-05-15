@@ -95,7 +95,20 @@ function joinSections(sections) {
 		.join('\n\n')}\n`;
 }
 
-export function composeEditorConfig(languageNames = []) {
+export const EMPTY_OVERRIDES = Object.freeze({
+	bodies: new Map(),
+	rawSections: new Map(),
+	hasRoot: false,
+});
+
+function pickSection(name, builtin, overrides) {
+	if (overrides.rawSections.has(name)) {
+		return overrides.rawSections.get(name);
+	}
+	return builtin;
+}
+
+export function composeEditorConfig(languageNames = [], overrides = EMPTY_OVERRIDES) {
 	const resolved = new Set();
 	for (const raw of languageNames) {
 		const name = ALIASES[raw] ?? raw;
@@ -107,7 +120,10 @@ export function composeEditorConfig(languageNames = []) {
 		resolved.add(name);
 	}
 	const ordered = AVAILABLE_LANGUAGES.filter((name) => resolved.has(name));
-	const sections = [base, ...ordered.map((name) => LANGUAGE_TEMPLATES[name])];
+	const sections = [
+		pickSection('base', base, overrides),
+		...ordered.map((name) => pickSection(name, LANGUAGE_TEMPLATES[name], overrides)),
+	];
 	return joinSections(sections);
 }
 
@@ -227,7 +243,10 @@ function bodyAfterFirstHeader(template) {
 	return lines.slice(headerIndex + 1).join('\n');
 }
 
-export function expectedBodyForLanguage(language) {
+export function expectedBodyForLanguage(language, overrides = EMPTY_OVERRIDES) {
+	if (overrides.bodies.has(language)) {
+		return overrides.bodies.get(language);
+	}
 	if (language === 'base') {
 		return parseSection(bodyAfterFirstHeader(base));
 	}

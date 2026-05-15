@@ -5,6 +5,7 @@ import { appendFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { BUILTIN_BASE_BODY } from '../fixtures/editorconfig.js';
 
 const cliEntry = fileURLToPath(new URL('../../index.js', import.meta.url));
 
@@ -106,7 +107,7 @@ describe('check (inferred mode) — base requirements', () => {
 	});
 
 	it('FAILs when root = true is missing', () => {
-		writeFileSync(state.target, '[*]\nindent_style = tab\nindent_size = 4\ntab_width = 4\nend_of_line = lf\ncharset = utf-8\nspelling_language = en\ntrim_trailing_whitespace = true\ninsert_final_newline = true\nquote_type = single\nspaces_around_operators = true\n', 'utf8');
+		writeFileSync(state.target, `[*]\n${BUILTIN_BASE_BODY}`, 'utf8');
 		const checked = runCli(['--mode=check', `--path=${state.target}`]);
 		assert.notEqual(checked.status, 0);
 		assert.match(checked.stdout, /\bFAIL\b/u);

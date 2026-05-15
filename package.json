@@ -3,6 +3,10 @@
 	"version": "1.0.0",
 	"description": "",
 	"main": "index.js",
+	"files": [
+		"index.js",
+		"src/"
+	],
 	"scripts": {
 		"lint": "oxlint",
 		"test": "node --test",
@@ -27,6 +31,9 @@
 	"author": "Jean Burellier",
 	"license": "MIT",
 	"type": "module",
+	"engines": {
+		"node": ">=24"
+	},
 	"bugs": {
 		"url": "https://github.com/sheplu/editorconfig/issues"
 	},

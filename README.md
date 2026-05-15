@@ -5,7 +5,7 @@ A small CLI to manage a **consistent `.editorconfig`** across your projects.
 - ✅ Generate a sane default `.editorconfig` in seconds
 - ✅ Check if your existing file matches the target setup
 - ✅ Confirm before overwriting an existing `.editorconfig` (or pass `--overwrite` to skip the prompt)
-- 🔜 Compare your file against the recommended template
+- ✅ Override the built-in template with a team-shared file via `--template` (local path or `https://` URL)
 
 ## Why?
 
@@ -113,6 +113,28 @@ This command will:
   - `0` if everything matches
   - `1` if differences are found
 
+### `--template` (custom team template)
+
+Both `write` and `check` accept a `--template` (or `-t`) flag pointing at a custom `.editorconfig`-syntax file. Sections in that file override the built-in defaults; languages it doesn't redefine still come from the built-ins. This lets a team host a single source of truth and reference it from every repo.
+
+The flag accepts either a local path or an `https://` URL:
+
+```bash
+# local file
+npx @sheplu/editorconfig --mode=write --template=./team.editorconfig
+
+# remote URL
+npx @sheplu/editorconfig --mode=check --template=https://raw.githubusercontent.com/example/team-config/main/.editorconfig
+```
+
+The custom template must follow the same semantics as the built-ins:
+
+- Use only known section headers (`[*]`, `[*.md]`, `[*.{js,jsx,...}]`, etc.). Unknown headers (like `[*.proto]`) are rejected.
+- Include `root = true` in the preamble whenever the template redefines `[*]`.
+- Each header may appear at most once.
+
+URL fetching is constrained for safety: `https://` only (`http://` is rejected before any network call), redirects must stay on https (max 5 hops), 10-second timeout, 1 MB response cap. Templates are fetched on every invocation — there is no local cache.
+
 ### `--help`
 
 ```bash
@@ -159,7 +181,7 @@ npm run test:integration  # integration only — spawns the CLI
 npm run lint              # oxlint
 ```
 
-CI runs lint, audit, and the full suite on every PR across Node 22 / 24 / 26.
+CI runs lint, audit, and the full suite on every PR across Node 24 / 26.
 
 ## Documentation
 

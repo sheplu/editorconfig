@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import {
 	BASE_SECTION_HEADER,
 	compareSection,
+	EMPTY_OVERRIDES,
 	expectedBodyForLanguage,
 	headerToLanguage,
 	languageToHeader,
@@ -34,12 +35,12 @@ function languageForHeader(header) {
 	return headerToLanguage(header);
 }
 
-function checkSection(section) {
+function checkSection(section, overrides) {
 	const language = languageForHeader(section.header);
 	if (!language) {
 		return { header: section.header, status: 'unknown' };
 	}
-	const expected = expectedBodyForLanguage(language);
+	const expected = expectedBodyForLanguage(language, overrides);
 	const { ok } = compareSection(section.body, expected);
 	if (ok) {
 		return { header: section.header, status: 'match' };
@@ -52,8 +53,8 @@ function buildExpectedHeaders(parsedLanguages) {
 	return [BASE_SECTION_HEADER, ...resolved.map((name) => languageToHeader(name))];
 }
 
-function buildResults({ parsedLanguages, parsed }) {
-	const results = parsed.sections.map(checkSection);
+function buildResults({ parsedLanguages, parsed, overrides }) {
+	const results = parsed.sections.map((section) => checkSection(section, overrides));
 	if (parsedLanguages !== NO_LANGUAGE_FILTER) {
 		const present = new Set(parsed.sections.map((section) => section.header));
 		const expectedHeaders = buildExpectedHeaders(parsedLanguages);
@@ -78,14 +79,14 @@ function buildBaseIssues(parsed) {
 	return issues;
 }
 
-export function compareEditorConfig(path = '.editorconfig', parsedLanguages = NO_LANGUAGE_FILTER) {
+export function compareEditorConfig(path = '.editorconfig', parsedLanguages = NO_LANGUAGE_FILTER, overrides = EMPTY_OVERRIDES) {
 	if (!existsSync(path)) {
 		throw new Error(`'${path}' does not exist`);
 	}
 	const text = readFileSync(path, 'utf8');
 	const parsed = parseSections(text);
 	const baseIssues = buildBaseIssues(parsed);
-	const results = buildResults({ parsedLanguages, parsed });
+	const results = buildResults({ parsedLanguages, parsed, overrides });
 	return { baseIssues, results };
 }
 
@@ -163,8 +164,8 @@ function formatSummary(report, isFailure) {
 	return formatPassSummary(counts);
 }
 
-export function runCheck(path, parsedLanguages, strict) {
-	const report = compareEditorConfig(path, parsedLanguages);
+export function runCheck({ path, parsedLanguages, strict, overrides }) {
+	const report = compareEditorConfig(path, parsedLanguages, overrides);
 	printReport(path, report);
 	const failed = reportIsFailing(report, strict);
 	console.log(formatSummary(report, failed));

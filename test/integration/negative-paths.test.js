@@ -34,6 +34,14 @@ describe('CLI argument errors', () => {
 		assert.match(result.stderr, /--help/u);
 	});
 
+	it('reports a non-unknown-option parseArgs error verbatim, without the "See --help." suffix', () => {
+		// Passing a value to a boolean flag triggers ERR_PARSE_ARGS_INVALID_OPTION_VALUE — the fallback branch in formatCliError.
+		const result = runCli(['--mode=write', `--path=${state.target}`, '--overwrite=value']);
+		assert.notEqual(result.status, 0);
+		assert.match(result.stderr, /does not take an argument/u);
+		assert.doesNotMatch(result.stderr, /See --help/u);
+	});
+
 	it('rejects an unknown short flag', () => {
 		const result = runCli(['--mode=write', `--path=${state.target}`, '-X']);
 		assert.notEqual(result.status, 0);
