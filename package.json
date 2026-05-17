@@ -40,6 +40,6 @@
 	"homepage": "https://github.com/sheplu/editorconfig#readme",
 	"devDependencies": {
 		"node-pty": "1.0.0",
-		"oxlint": "^1.64.0"
+		"oxlint": "^1.65.0"
 	}
 }
