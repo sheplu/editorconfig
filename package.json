@@ -1,7 +1,7 @@
 {
 	"name": "@sheplu/editorconfig",
 	"version": "1.0.0",
-	"description": "",
+	"description": "CLI to generate and validate a consistent .editorconfig across your projects",
 	"main": "index.js",
 	"files": [
 		"index.js",
