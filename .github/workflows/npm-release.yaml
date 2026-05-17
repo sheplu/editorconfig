@@ -106,7 +106,7 @@ jobs:
           VERSION=${VERSION:1}
           CURRENT_VERSION=$(npm pkg get version | tr -d '"')
           if [ "$CURRENT_VERSION" != "$VERSION" ]; then
-            npm version $VERSION --no-git-tag-version
+            npm version "$VERSION" --no-git-tag-version
           else
             echo "Version already set to $VERSION, skipping npm version command"
           fi
