@@ -75,7 +75,7 @@ jobs:
         run: npm ci
 
       - name: Run tests
-        run: npm test
+        run: npm run test:coverage
 
   publish:
     runs-on: ubuntu-24.04-arm

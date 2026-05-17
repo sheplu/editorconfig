@@ -178,6 +178,7 @@ Run them with:
 npm test                  # everything
 npm run test:unit         # unit only — runs in ~50ms
 npm run test:integration  # integration only — spawns the CLI
+npm run test:coverage.    # coverage with 95% threshold
 npm run lint              # oxlint
 ```
 
