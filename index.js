@@ -11,6 +11,7 @@ import {
 } from './src/templates/index.js';
 import { loadCustomTemplate } from './src/templates/custom-template.js';
 import { compareEditorConfig, NO_LANGUAGE_FILTER, runCheck } from './src/check.js';
+import { logger } from './src/utils/logger.js';
 
 export { compareEditorConfig };
 
@@ -74,7 +75,7 @@ function formatAliasList() {
 }
 
 export function printHelp() {
-	console.log(`Usage: editorconfig --mode=<command> [--path=<path>] [--languages=<list>] [--template=<path|url>]
+	logger.log(`Usage: editorconfig --mode=<command> [--path=<path>] [--languages=<list>] [--template=<path|url>]
 
 Commands:
   write    Create a .editorconfig file with the selected language sections
@@ -124,7 +125,7 @@ function promptLanguages() {
 		const numbered = AVAILABLE_LANGUAGES
 			.map((name, index) => `  ${index + 1}. ${name}`)
 			.join('\n');
-		console.log(`Available language sections:\n${numbered}`);
+		logger.log(`Available language sections:\n${numbered}`);
 		rl.question('Languages? [comma-separated names or indices, blank=base only] ', (answer) => {
 			rl.close();
 			resolve(resolvePromptAnswer(answer));
@@ -154,7 +155,7 @@ function confirmOverwrite(path) {
 
 async function handleExistingTarget(path, languages, overrides) {
 	if (!process.stdin.isTTY) {
-		console.error(`\`${path}\` already exists. Use --overwrite to replace it.`);
+		logger.error(`\`${path}\` already exists. Use --overwrite to replace it.`);
 		process.exitCode = 1;
 		return;
 	}
@@ -163,7 +164,7 @@ async function handleExistingTarget(path, languages, overrides) {
 		createEditorConfig(path, languages, overrides);
 	}
 	else {
-		console.log(`Skipped: \`${path}\` was not modified.`);
+		logger.log(`Skipped: \`${path}\` was not modified.`);
 	}
 }
 
@@ -185,7 +186,7 @@ function dispatchCheck({ path, languages, strict, overrides }) {
 		runCheck({ path, parsedLanguages: filter, strict, overrides });
 	}
 	catch (error) {
-		console.error(error.message);
+		logger.error(error.message);
 		process.exitCode = 1;
 	}
 }
@@ -195,7 +196,7 @@ async function dispatchWrite({ path, overwrite, languages, overrides }) {
 		await runWrite({ path, overwrite, parsedLanguages: languages, overrides });
 	}
 	catch (error) {
-		console.error(error.message);
+		logger.error(error.message);
 		process.exitCode = 1;
 	}
 }
@@ -209,7 +210,7 @@ async function runCommand({ mode, path, overwrite, languages, strict, overrides 
 		dispatchCheck({ path, languages, strict, overrides });
 		return;
 	}
-	console.error('invalid command');
+	logger.error('invalid command');
 	process.exitCode = 1;
 }
 
@@ -225,7 +226,7 @@ function parseCliArgs(args) {
 		return parseArgs({ args, options });
 	}
 	catch (error) {
-		console.error(formatCliError(error));
+		logger.error(formatCliError(error));
 		process.exitCode = 1;
 		return false;
 	}
@@ -241,7 +242,7 @@ async function resolveOverrides(templateValue) {
 		return await loadCustomTemplate(templateValue);
 	}
 	catch (error) {
-		console.error(error.message);
+		logger.error(error.message);
 		process.exitCode = 1;
 		return OVERRIDES_FAILED;
 	}
@@ -279,7 +280,7 @@ if (process.argv[1] === import.meta.filename) {
 		await main();
 	}
 	catch (error) {
-		console.error(error.message);
+		logger.error(error.message);
 		process.exitCode = 1;
 	}
 }

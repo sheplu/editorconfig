@@ -1,17 +1,18 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { printHelp, options } from '../../index.js';
+import { logger } from '../../src/utils/logger.js';
 
 const SUPPORTED_COMMANDS = ['write', 'check'];
 
 function captureHelp() {
-	const original = console.log;
+	const original = logger.log;
 	let captured = '';
-	console.log = (msg) => { captured += msg; };
+	logger.log = (msg) => { captured += msg; };
 	try {
 		printHelp();
 	} finally {
-		console.log = original;
+		logger.log = original;
 	}
 	return captured;
 }

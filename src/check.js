@@ -9,6 +9,7 @@ import {
 	parseSections,
 	resolveLanguageNames,
 } from './templates/index.js';
+import { logger } from './utils/logger.js';
 
 export const NO_LANGUAGE_FILTER = Symbol('check-no-language-filter');
 
@@ -108,15 +109,15 @@ export function reportIsFailing({ baseIssues, results }, strict) {
 }
 
 function printReport(path, report) {
-	console.log(`Checking ${path}`);
-	console.log('');
+	logger.log(`Checking ${path}`);
+	logger.log('');
 	for (const issue of report.baseIssues) {
-		console.log(formatLine(issue));
+		logger.log(formatLine(issue));
 	}
 	for (const entry of report.results) {
-		console.log(formatLine(entry));
+		logger.log(formatLine(entry));
 	}
-	console.log('');
+	logger.log('');
 }
 
 function summarize(report) {
@@ -168,7 +169,7 @@ export function runCheck({ path, parsedLanguages, strict, overrides }) {
 	const report = compareEditorConfig(path, parsedLanguages, overrides);
 	printReport(path, report);
 	const failed = reportIsFailing(report, strict);
-	console.log(formatSummary(report, failed));
+	logger.log(formatSummary(report, failed));
 	if (failed) {
 		process.exitCode = 1;
 	}
