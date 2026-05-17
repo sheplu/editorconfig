@@ -14,14 +14,21 @@
     "restriction": "error"
   },
   "rules": {
-    "no-console": "off",
     "func-style": "off",
     "sort-imports": "off",
     "sort-keys": "off",
-    "no-magic-numbers": "off",
-    "no-async-await": "off"
+    "no-async-await": "off",
+    "no-magic-numbers": ["error", { "ignore": [-1, 0, 1, 2], "ignoreArrayIndexes": true, "enforceConst": true }]
   },
   "env": {
     "builtin": true
-  }
+  },
+  "overrides": [
+    {
+      "files": ["test/**"],
+      "rules": {
+        "no-magic-numbers": "off"
+      }
+    }
+  ]
 }

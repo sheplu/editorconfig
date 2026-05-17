@@ -1,15 +1,18 @@
 import { parseRedirectLocation } from './url.js';
 
 const TIMEOUT_MS = 10_000;
+const MS_PER_SECOND = 1000;
 const MAX_BYTES = 1_048_576;
 const MAX_REDIRECTS = 5;
+const HTTP_REDIRECT_MIN = 300;
+const HTTP_REDIRECT_MAX = 400;
 
 function ignoreCancelError() {
 	return false;
 }
 
 export function isRedirect(status) {
-	return status >= 300 && status < 400;
+	return status >= HTTP_REDIRECT_MIN && status < HTTP_REDIRECT_MAX;
 }
 
 export function rejectOversized(url) {
@@ -81,7 +84,7 @@ export async function performFetch(initialUrl, signal) {
 
 export function describeFetchError(url, error) {
 	if (error.name === 'AbortError') {
-		return new Error(`failed to fetch '${url}': request timed out after ${TIMEOUT_MS / 1000}s`);
+		return new Error(`failed to fetch '${url}': request timed out after ${TIMEOUT_MS / MS_PER_SECOND}s`);
 	}
 	if (/^failed to fetch |^template body /u.test(error.message)) {
 		return error;
