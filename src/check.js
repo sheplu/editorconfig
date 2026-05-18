@@ -18,6 +18,7 @@ const STATUS_GLYPH = {
 	mismatch: '❌',
 	missing: '❌',
 	'no-root': '❌',
+	'child-root-forbidden': '❌',
 	unknown: '⚠️ ',
 };
 
@@ -26,8 +27,11 @@ const STATUS_DETAIL = {
 	mismatch: 'section body does not match',
 	missing: 'missing',
 	'no-root': "missing 'root = true' before sections",
+	'child-root-forbidden': "child file must not declare 'root = true'",
 	unknown: 'unknown header (not validated)',
 };
+
+const FAILING_STATUSES = new Set(['mismatch', 'missing', 'no-root', 'child-root-forbidden']);
 
 function languageForHeader(header) {
 	if (header === BASE_SECTION_HEADER) {
@@ -36,10 +40,13 @@ function languageForHeader(header) {
 	return headerToLanguage(header);
 }
 
-function checkSection(section, overrides) {
+function checkSection(section, overrides, role) {
 	const language = languageForHeader(section.header);
 	if (!language) {
 		return { header: section.header, status: 'unknown' };
+	}
+	if (role === 'child') {
+		return { header: section.header, status: 'match' };
 	}
 	const expected = expectedBodyForLanguage(language, overrides);
 	const { ok } = compareSection(section.body, expected);
@@ -54,8 +61,8 @@ function buildExpectedHeaders(parsedLanguages) {
 	return [BASE_SECTION_HEADER, ...resolved.map((name) => languageToHeader(name))];
 }
 
-function buildResults({ parsedLanguages, parsed, overrides }) {
-	const results = parsed.sections.map((section) => checkSection(section, overrides));
+function buildResults({ parsedLanguages, parsed, overrides, role }) {
+	const results = parsed.sections.map((section) => checkSection(section, overrides, role));
 	if (parsedLanguages !== NO_LANGUAGE_FILTER) {
 		const present = new Set(parsed.sections.map((section) => section.header));
 		const expectedHeaders = buildExpectedHeaders(parsedLanguages);
@@ -68,7 +75,7 @@ function buildResults({ parsedLanguages, parsed, overrides }) {
 	return results;
 }
 
-function buildBaseIssues(parsed) {
+function buildRootBaseIssues(parsed) {
 	const issues = [];
 	const hasBase = parsed.sections.some((section) => section.header === BASE_SECTION_HEADER);
 	if (!hasBase) {
@@ -80,14 +87,47 @@ function buildBaseIssues(parsed) {
 	return issues;
 }
 
-export function compareEditorConfig(path = '.editorconfig', parsedLanguages = NO_LANGUAGE_FILTER, overrides = EMPTY_OVERRIDES) {
+function buildChildBaseIssues(parsed) {
+	if (parsed.hasRoot) {
+		return [{ header: BASE_SECTION_HEADER, status: 'child-root-forbidden' }];
+	}
+	return [];
+}
+
+function buildBaseIssuesForRole(parsed, role) {
+	if (role === 'child') {
+		return buildChildBaseIssues(parsed);
+	}
+	return buildRootBaseIssues(parsed);
+}
+
+export function compareEditorConfigForRole({
+	path,
+	parsedLanguages = NO_LANGUAGE_FILTER,
+	overrides = EMPTY_OVERRIDES,
+	role = 'root',
+}) {
 	if (!existsSync(path)) {
 		throw new Error(`'${path}' does not exist`);
 	}
 	const text = readFileSync(path, 'utf8');
 	const parsed = parseSections(text);
-	const baseIssues = buildBaseIssues(parsed);
-	const results = buildResults({ parsedLanguages, parsed, overrides });
+	const baseIssues = buildBaseIssuesForRole(parsed, role);
+	let effectiveLanguages = parsedLanguages;
+	if (role === 'child') {
+		effectiveLanguages = NO_LANGUAGE_FILTER;
+	}
+	const results = buildResults({ parsedLanguages: effectiveLanguages, parsed, overrides, role });
+	return { baseIssues, results, parsed };
+}
+
+export function compareEditorConfig(path = '.editorconfig', parsedLanguages = NO_LANGUAGE_FILTER, overrides = EMPTY_OVERRIDES) {
+	const { baseIssues, results } = compareEditorConfigForRole({
+		path,
+		parsedLanguages,
+		overrides,
+		role: 'root',
+	});
 	return { baseIssues, results };
 }
 
@@ -101,15 +141,20 @@ function formatLine({ header, status }) {
 }
 
 export function reportIsFailing({ baseIssues, results }, strict) {
-	const failing = [...baseIssues, ...results].some((entry) =>
-		entry.status === 'mismatch' || entry.status === 'missing' || entry.status === 'no-root',
-	);
+	const failing = [...baseIssues, ...results].some((entry) => FAILING_STATUSES.has(entry.status));
 	const hasUnknown = results.some((entry) => entry.status === 'unknown');
 	return failing || (strict && hasUnknown);
 }
 
-function printReport(path, report) {
-	logger.log(`Checking ${path}`);
+function buildHeading(displayPath, label) {
+	if (label) {
+		return `Checking ${displayPath} ${label}`;
+	}
+	return `Checking ${displayPath}`;
+}
+
+export function printReport(displayPath, report, { label } = {}) {
+	logger.log(buildHeading(displayPath, label));
 	logger.log('');
 	for (const issue of report.baseIssues) {
 		logger.log(formatLine(issue));
@@ -120,13 +165,11 @@ function printReport(path, report) {
 	logger.log('');
 }
 
-function summarize(report) {
+export function summarizeReport(report) {
 	const lines = [...report.baseIssues, ...report.results];
 	const total = lines.length;
 	const matched = lines.filter((entry) => entry.status === 'match').length;
-	const failed = lines.filter((entry) =>
-		entry.status === 'mismatch' || entry.status === 'missing' || entry.status === 'no-root',
-	).length;
+	const failed = lines.filter((entry) => FAILING_STATUSES.has(entry.status)).length;
 	const unknown = lines.filter((entry) => entry.status === 'unknown').length;
 	return { total, matched, failed, unknown };
 }
@@ -158,7 +201,7 @@ function formatPassSummary({ matched, unknown }) {
 }
 
 function formatSummary(report, isFailure) {
-	const counts = summarize(report);
+	const counts = summarizeReport(report);
 	if (isFailure) {
 		return formatFailureSummary(counts);
 	}

@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { NOT_PROVIDED, parseLanguages } from '../../index.js';
+import { NOT_PROVIDED, parseLanguages } from '../../src/cli/options.js';
 
 describe('parseLanguages — non-string input', () => {
 	it('returns NOT_PROVIDED when called with no argument (parseArgs result for an absent flag)', () => {

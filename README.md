@@ -6,6 +6,7 @@ A small CLI to manage a **consistent `.editorconfig`** across your projects.
 - ✅ Check if your existing file matches the target setup
 - ✅ Confirm before overwriting an existing `.editorconfig` (or pass `--overwrite` to skip the prompt)
 - ✅ Override the built-in template with a team-shared file via `--template` (local path or `https://` URL)
+- ✅ Validate every `.editorconfig` in a monorepo at once with `--recursive`
 
 ## Why?
 
@@ -112,6 +113,48 @@ This command will:
 - Exit with:
   - `0` if everything matches
   - `1` if differences are found
+
+### `--recursive` (monorepo check)
+
+```bash
+npx @sheplu/editorconfig --mode=check --recursive
+```
+
+Walks the current directory (or the directory passed via `--path`) and validates **every** `.editorconfig` it finds. Useful for monorepos where a top-level file sets defaults and sub-packages add narrower overrides.
+
+How files are classified:
+
+- The shortest-path `.editorconfig` in each subtree is treated as the **root** and validated with the same rules as `--mode=check` (must declare `root = true`, must have `[*]`, sections must match the canonical template).
+- Deeper `.editorconfig` files are treated as **children**. Children must NOT declare `root = true`, may omit `[*]`, and may legitimately override individual keys.
+- Sibling subtrees with no shared ancestor `.editorconfig` are each validated as their own root.
+
+Cross-file checks emitted on top of per-file validation:
+
+- `child-root` — a child declared `root = true` (**fail**).
+- `redundant` — a child redeclares a parent key/value verbatim (**warn**).
+- `contradiction` — a child reuses the same header as its root (e.g. both `[*]`) with a different value (**warn**). Different globs like child `[*.js]` overriding root `[*]` are silent — they are legitimate per spec.
+
+Skipped during the walk: `node_modules`, `.git`, `dist`, `build`, `coverage`, `.next`, `.cache`, and symlinked directories.
+
+Flag interactions in recursive mode:
+
+- `--path` becomes the start directory for the walk (default: cwd).
+- `--languages` is enforced on the root file only — children may add or omit language sections freely.
+- `--template` overrides apply to the root section comparison.
+- `--strict` fails on unknown headers in any file.
+
+Exit codes: `0` on pass (warnings allowed), `1` if any file fails or any cross-file failure (e.g. child-root) is detected.
+
+```bash
+# Validate everything under cwd
+npx @sheplu/editorconfig --mode=check --recursive
+
+# Validate only one subtree
+npx @sheplu/editorconfig --mode=check --recursive --path=./packages/web
+
+# CI: enforce js/md sections on the root, anywhere else may add what they need
+npx @sheplu/editorconfig --mode=check --recursive --languages=js,md
+```
 
 ### `--template` (custom team template)
 
