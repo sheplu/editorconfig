@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadCustomTemplate } from '../../src/templates/custom-template.js';
+import { OVERRIDE_BASE_MARKDOWN } from '../fixtures/editorconfig.js';
 
 const state = { workdir: '', file: '' };
 
@@ -89,18 +90,7 @@ trim_trailing_whitespace = false
 
 describe('loadCustomTemplate — line endings', () => {
 	it('parses a CRLF-line-ending template equivalently to LF', async () => {
-		const lfContent = `root = true
-
-[*]
-indent_style = space
-indent_size = 2
-
-[*.md]
-indent_style = space
-indent_size = 4
-trim_trailing_whitespace = false
-`;
-		write(lfContent.replaceAll('\n', '\r\n'));
+		write(OVERRIDE_BASE_MARKDOWN.replaceAll('\n', '\r\n'));
 		const overrides = await loadCustomTemplate(state.file);
 		assert.equal(overrides.hasRoot, true);
 		assert.equal(overrides.bodies.size, 2);
@@ -210,17 +200,7 @@ indent_size = 2
 describe('loadCustomTemplate — URL input', () => {
 	it('loads via the URL branch with stubbed fetch', async () => {
 		const original = globalThis.fetch;
-		const body = `root = true
-
-[*]
-indent_style = space
-indent_size = 2
-
-[*.md]
-indent_style = space
-indent_size = 4
-trim_trailing_whitespace = false
-`;
+		const body = OVERRIDE_BASE_MARKDOWN;
 		globalThis.fetch = () => Promise.resolve({
 			ok: true,
 			status: 200,

@@ -5,7 +5,7 @@ import { appendFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BUILTIN_BASE_BODY } from '../fixtures/editorconfig.js';
+import { BUILTIN_BASE_BODY, BUILTIN_BASE_FILE_TWEAKED } from '../fixtures/editorconfig.js';
 
 const cliEntry = fileURLToPath(new URL('../../index.js', import.meta.url));
 
@@ -68,28 +68,7 @@ describe('check (inferred mode) — body tampering', () => {
 
 	it('PASSes when the file is whitespace-tweaked but semantically equivalent', () => {
 		writeSubset('md');
-		// Reorder keys, drop spaces around equals, add comments and blank lines.
-		const tweaked = `root = true
-
-[*]
-indent_style=tab
-indent_size = 4
-tab_width = 4
-end_of_line=lf
-charset = utf-8
-spelling_language=en
-# a comment
-trim_trailing_whitespace=true
-insert_final_newline = true
-quote_type=single
-spaces_around_operators=true
-
-[*.md]
-trim_trailing_whitespace = false
-indent_size = 2
-indent_style = space
-`;
-		writeFileSync(state.target, tweaked, 'utf8');
+		writeFileSync(state.target, BUILTIN_BASE_FILE_TWEAKED, 'utf8');
 
 		const checked = runCli(['--mode=check', `--path=${state.target}`]);
 		assert.equal(checked.status, 0, checked.stderr);
