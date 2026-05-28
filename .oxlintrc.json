@@ -15,6 +15,7 @@
   },
   "rules": {
     "func-style": "off",
+    "unicorn/import-style": "off",
     "sort-imports": "off",
     "sort-keys": "off",
     "no-async-await": "off",
