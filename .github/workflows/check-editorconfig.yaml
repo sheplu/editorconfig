@@ -3,7 +3,6 @@ name: Check editorconfig
 on:
   workflow_dispatch:
   schedule:
-    # Daily at 06:00 UTC
     - cron: "0 6 * * *"
 
 concurrency:
