@@ -60,9 +60,14 @@ async function dispatchWrite({ path, overwrite, languages, overrides }) {
 	}
 }
 
-async function handleWrite({ path, overwrite, languages, overrides, recursive }) {
+async function handleWrite({ path, overwrite, languages, overrides, recursive, json }) {
 	if (recursive) {
 		logger.error('--recursive (-r) is only supported with --mode=check');
+		process.exitCode = 1;
+		return;
+	}
+	if (json) {
+		logger.error('--json is only supported with --mode=check');
 		process.exitCode = 1;
 		return;
 	}
@@ -71,7 +76,7 @@ async function handleWrite({ path, overwrite, languages, overrides, recursive })
 
 async function runCommand({ mode, path, overwrite, languages, strict, overrides, recursive, json }) {
 	if (mode === 'write') {
-		await handleWrite({ path, overwrite, languages, overrides, recursive });
+		await handleWrite({ path, overwrite, languages, overrides, recursive, json });
 		return;
 	}
 	if (mode === 'check') {
