@@ -208,6 +208,8 @@ Single-file shape:
 
 In `--recursive` mode the payload instead carries `recursive: true`, a `files` array (each with its `role`, `summary`, and `sections`) and a `crossFileIssues` array describing `child-root` / `redundant` / `contradiction` findings. When no JSON output is requested, the human-readable report is printed exactly as before.
 
+`--json` is only meaningful for `check`; combining it with `--mode=write` is rejected with a non-zero exit.
+
 ### `--version`
 
 ```bash

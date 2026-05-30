@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -65,6 +65,13 @@ describe('check --json', () => {
 		assert.doesNotMatch(checked.stdout, /PASS|Checking/u);
 		// The whole stdout must parse as a single JSON document.
 		assert.doesNotThrow(() => JSON.parse(checked.stdout));
+	});
+
+	it('rejects --json with --mode=write and writes nothing', () => {
+		const result = runCli(['--mode=write', `--path=${state.target}`, '--json']);
+		assert.notEqual(result.status, 0);
+		assert.match(result.stderr, /--json is only supported with --mode=check/u);
+		assert.equal(existsSync(state.target), false);
 	});
 });
 
