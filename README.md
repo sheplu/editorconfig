@@ -183,6 +183,39 @@ The custom template must follow the same semantics as the built-ins:
 
 URL fetching is constrained for safety: `https://` only (`http://` is rejected before any network call), redirects must stay on https (max 5 hops), 10-second timeout, 1 MB response cap. Templates are fetched on every invocation — there is no local cache.
 
+### `--json` (machine-readable check output)
+
+`check` accepts a `--json` flag that swaps the human-readable report for a structured JSON document on stdout. The exit code is unchanged (`0` pass, `1` fail), so it stays drop-in for CI while letting dashboards and scripts parse the result.
+
+```bash
+npx @sheplu/editorconfig --mode=check --json
+npx @sheplu/editorconfig --mode=check --recursive --json
+```
+
+Single-file shape:
+
+```json
+{
+  "mode": "check",
+  "path": ".editorconfig",
+  "ok": true,
+  "summary": { "total": 1, "matched": 1, "failed": 0, "unknown": 0 },
+  "sections": [
+    { "header": "[*]", "status": "match", "detail": "" }
+  ]
+}
+```
+
+In `--recursive` mode the payload instead carries `recursive: true`, a `files` array (each with its `role`, `summary`, and `sections`) and a `crossFileIssues` array describing `child-root` / `redundant` / `contradiction` findings. When no JSON output is requested, the human-readable report is printed exactly as before.
+
+### `--version`
+
+```bash
+npx @sheplu/editorconfig --version
+```
+
+Prints the installed package version (also available as `-v`).
+
 ### `--help`
 
 ```bash

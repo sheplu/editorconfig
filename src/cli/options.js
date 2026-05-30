@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import {
 	ALIASES,
@@ -10,10 +11,18 @@ export const options = {
 	path: { type: 'string', short: 'p' },
 	languages: { type: 'string', short: 'l' },
 	help: { type: 'boolean', short: 'h' },
+	version: { type: 'boolean', short: 'v' },
 	overwrite: { type: 'boolean', short: 'o' },
 	strict: { type: 'boolean', short: 's' },
 	template: { type: 'string', short: 't' },
 	recursive: { type: 'boolean', short: 'r' },
+	json: { type: 'boolean' },
+};
+
+export function printVersion() {
+	const pkgUrl = new URL('../../package.json', import.meta.url);
+	const { version } = JSON.parse(readFileSync(pkgUrl, 'utf8'));
+	logger.log(version);
 };
 
 export const NOT_PROVIDED = Symbol('languages-not-provided');
@@ -41,7 +50,7 @@ function formatAliasList() {
 }
 
 export function printHelp() {
-	logger.log(`Usage: editorconfig --mode=<command> [--path=<path>] [--languages=<list>] [--template=<path|url>] [--recursive]
+	logger.log(`Usage: editorconfig --mode=<command> [--path=<path>] [--languages=<list>] [--template=<path|url>] [--recursive] [--json]
 
 Commands:
   write    Create a .editorconfig file with the selected language sections
@@ -55,6 +64,8 @@ Options:
   -s, --strict     Treat unknown section headers as failures (check only)
   -t, --template   Path or https URL to a custom .editorconfig-syntax file whose sections override the built-in ones
   -r, --recursive  Check only. Walk the start directory and validate every .editorconfig (root + children) with cascade checks
+      --json       Emit check results as JSON instead of human-readable text (check only)
+  -v, --version    Show the installed version
   -h, --help       Show this help message
 
 Languages: ${AVAILABLE_LANGUAGES.join(', ')}
