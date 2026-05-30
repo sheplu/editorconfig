@@ -143,7 +143,7 @@ function formatLine({ header, status }) {
 export function reportIsFailing({ baseIssues, results }, strict) {
 	const failing = [...baseIssues, ...results].some((entry) => FAILING_STATUSES.has(entry.status));
 	const hasUnknown = results.some((entry) => entry.status === 'unknown');
-	return failing || (strict && hasUnknown);
+	return failing || Boolean(strict && hasUnknown);
 }
 
 function buildHeading(displayPath, label) {
@@ -208,11 +208,38 @@ function formatSummary(report, isFailure) {
 	return formatPassSummary(counts);
 }
 
-export function runCheck({ path, parsedLanguages, strict, overrides }) {
+export function identityReplacer(_key, value) {
+	return value;
+}
+
+export function reportToSections(report) {
+	return [...report.baseIssues, ...report.results].map(({ header, status }) => ({
+		header,
+		status,
+		detail: STATUS_DETAIL[status],
+	}));
+}
+
+export function buildCheckJson({ path, report, failed }) {
+	return {
+		mode: 'check',
+		path,
+		ok: !failed,
+		summary: summarizeReport(report),
+		sections: reportToSections(report),
+	};
+}
+
+export function runCheck({ path, parsedLanguages, strict, overrides, json }) {
 	const report = compareEditorConfig(path, parsedLanguages, overrides);
-	printReport(path, report);
 	const failed = reportIsFailing(report, strict);
-	logger.log(formatSummary(report, failed));
+	if (json) {
+		logger.log(JSON.stringify(buildCheckJson({ path, report, failed }), identityReplacer, 2));
+	}
+	else {
+		printReport(path, report);
+		logger.log(formatSummary(report, failed));
+	}
 	if (failed) {
 		process.exitCode = 1;
 	}

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { compareEditorConfig } from './src/check.js';
-import { parseCliArgs, printHelp } from './src/cli/options.js';
+import { parseCliArgs, printHelp, printVersion } from './src/cli/options.js';
 import { dispatchValues } from './src/cli/dispatch.js';
 import { createEditorConfig } from './src/cli/write-flow.js';
 
@@ -14,6 +14,10 @@ async function main() {
 	}
 	if (parsed.values.help) {
 		printHelp();
+		return;
+	}
+	if (parsed.values.version) {
+		printVersion();
 		return;
 	}
 	await dispatchValues(parsed.values);

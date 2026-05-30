@@ -32,17 +32,17 @@ function resolveCheckPath(values) {
 	return '.editorconfig';
 }
 
-function dispatchCheck({ path, languages, strict, overrides, recursive }) {
+function dispatchCheck({ path, languages, strict, overrides, recursive, json }) {
 	let filter = languages;
 	if (filter === NOT_PROVIDED) {
 		filter = NO_LANGUAGE_FILTER;
 	}
 	try {
 		if (recursive) {
-			runCheckRecursive({ startDir: path, parsedLanguages: filter, strict, overrides });
+			runCheckRecursive({ startDir: path, parsedLanguages: filter, strict, overrides, json });
 			return;
 		}
-		runCheck({ path, parsedLanguages: filter, strict, overrides });
+		runCheck({ path, parsedLanguages: filter, strict, overrides, json });
 	}
 	catch (error) {
 		logger.error(error.message);
@@ -69,13 +69,13 @@ async function handleWrite({ path, overwrite, languages, overrides, recursive })
 	await dispatchWrite({ path, overwrite, languages, overrides });
 }
 
-async function runCommand({ mode, path, overwrite, languages, strict, overrides, recursive }) {
+async function runCommand({ mode, path, overwrite, languages, strict, overrides, recursive, json }) {
 	if (mode === 'write') {
 		await handleWrite({ path, overwrite, languages, overrides, recursive });
 		return;
 	}
 	if (mode === 'check') {
-		dispatchCheck({ path, languages, strict, overrides, recursive });
+		dispatchCheck({ path, languages, strict, overrides, recursive, json });
 		return;
 	}
 	logger.error('invalid command');
@@ -95,5 +95,6 @@ export async function dispatchValues(values) {
 		strict: values.strict,
 		overrides,
 		recursive: Boolean(values.recursive),
+		json: Boolean(values.json),
 	});
 }

@@ -4,9 +4,11 @@ import { discoverEditorConfigs } from './discover.js';
 import { classify, crossFileIssues } from './cascade.js';
 import {
 	compareEditorConfigForRole,
+	identityReplacer,
 	NO_LANGUAGE_FILTER,
 	printReport,
 	reportIsFailing,
+	reportToSections,
 	summarizeReport,
 } from './check.js';
 import { logger } from './utils/logger.js';
@@ -162,21 +164,23 @@ function formatGlobalSummary({ entries, crossIssues, strict }) {
 	return { line: `${summaryHead(passed)} — ${parts.join('; ')}`, failed: !passed };
 }
 
-function processTree({ tree, parsedLanguages, overrides, startDir }) {
+function processTree({ tree, parsedLanguages, overrides, startDir, json }) {
 	const entries = buildFileEntries(tree, parsedLanguages, overrides);
 	const [rootEntry, ...childEntries] = entries;
 	const crossIssues = collectCrossIssues(rootEntry, childEntries);
-	for (const entry of entries) {
-		printFileBlock(entry, startDir);
+	if (!json) {
+		for (const entry of entries) {
+			printFileBlock(entry, startDir);
+		}
 	}
 	return { entries, crossIssues };
 }
 
-function gatherAll({ trees, parsedLanguages, overrides, startDir }) {
+function gatherAll({ trees, parsedLanguages, overrides, startDir, json }) {
 	const allEntries = [];
 	const allCrossIssues = [];
 	for (const tree of trees) {
-		const { entries, crossIssues } = processTree({ tree, parsedLanguages, overrides, startDir });
+		const { entries, crossIssues } = processTree({ tree, parsedLanguages, overrides, startDir, json });
 		allEntries.push(...entries);
 		allCrossIssues.push(...crossIssues);
 	}
@@ -192,18 +196,82 @@ function reportAndExit({ allEntries, allCrossIssues, strict, startDir }) {
 	}
 }
 
-export function runCheckRecursive({ startDir: rawStart, parsedLanguages, strict, overrides }) {
-	const startDir = resolveStartDir(rawStart);
-	const paths = discoverEditorConfigs(startDir);
-	if (paths.length === 0) {
-		logger.log(`No .editorconfig files found under ${startDir}`);
+function jsonFileEntry(entry, startDir, strict) {
+	return {
+		path: displayPath(entry.path, startDir),
+		role: entry.role,
+		failed: reportIsFailing(entry.report, strict),
+		summary: summarizeReport(entry.report),
+		sections: reportToSections(entry.report),
+	};
+}
+
+function jsonCrossIssue(issue, startDir) {
+	const copy = {};
+	for (const [key, value] of Object.entries(issue)) {
+		copy[key] = value;
+	}
+	copy.file = displayPath(issue.file, startDir);
+	return copy;
+}
+
+function buildRecursiveJson({ allEntries, allCrossIssues, strict, startDir }) {
+	const summary = formatGlobalSummary({ entries: allEntries, crossIssues: allCrossIssues, strict });
+	return {
+		mode: 'check',
+		recursive: true,
+		startDir,
+		ok: !summary.failed,
+		files: allEntries.map((entry) => jsonFileEntry(entry, startDir, strict)),
+		crossFileIssues: allCrossIssues.map((issue) => jsonCrossIssue(issue, startDir)),
+	};
+}
+
+function emitJson(payload) {
+	logger.log(JSON.stringify(payload, identityReplacer, 2));
+}
+
+function reportRecursiveJson(payload) {
+	const json = buildRecursiveJson(payload);
+	emitJson(json);
+	if (!json.ok) {
+		process.exitCode = 1;
+	}
+}
+
+function emitEmptyRecursiveJson(startDir) {
+	emitJson({ mode: 'check', recursive: true, startDir, ok: true, files: [], crossFileIssues: [] });
+}
+
+function reportEmpty(startDir, json) {
+	if (json) {
+		emitEmptyRecursiveJson(startDir);
 		return;
 	}
+	logger.log(`No .editorconfig files found under ${startDir}`);
+}
+
+function runWalk({ startDir, paths, parsedLanguages, strict, overrides, json }) {
 	const { allEntries, allCrossIssues } = gatherAll({
 		trees: classify(paths),
 		parsedLanguages,
 		overrides,
 		startDir,
+		json,
 	});
+	if (json) {
+		reportRecursiveJson({ allEntries, allCrossIssues, strict, startDir });
+		return;
+	}
 	reportAndExit({ allEntries, allCrossIssues, strict, startDir });
+}
+
+export function runCheckRecursive({ startDir: rawStart, parsedLanguages, strict, overrides, json }) {
+	const startDir = resolveStartDir(rawStart);
+	const paths = discoverEditorConfigs(startDir);
+	if (paths.length === 0) {
+		reportEmpty(startDir, json);
+		return;
+	}
+	runWalk({ startDir, paths, parsedLanguages, strict, overrides, json });
 }
