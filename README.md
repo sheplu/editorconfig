@@ -215,6 +215,12 @@ Tests live under `test/` and are split by scope:
 - `test/unit/` — fast, in-process tests of exported functions (no spawning, no I/O beyond a tmp dir).
 - `test/integration/` — full CLI runs. The interactive prompt path is exercised in a real pseudoterminal via [`node-pty`](https://github.com/microsoft/node-pty); the rest go through `child_process.spawnSync` with a closed stdin.
 
+`node-pty` ships a native binding that npm normally compiles via a postinstall script. This repo sets `ignore-scripts=true` in `.npmrc`, so after `npm install` you need to build it once:
+
+```bash
+npm run rebuild:native
+```
+
 Run them with:
 
 ```bash
