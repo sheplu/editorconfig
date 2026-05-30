@@ -55,7 +55,7 @@ jobs:
         run: npm ci
 
       - name: Lint
-        run: npm run lint
+        run: node --run lint
 
   actionlint:
     runs-on: ubuntu-24.04-arm
@@ -98,10 +98,10 @@ jobs:
         run: npm ci
 
       - name: Rebuild node-pty native binding
-        run: npm run rebuild:native
+        run: node --run rebuild:native
 
       - name: Run tests
-        run: npm run test:coverage
+        run: node --run test:coverage
 
   self-check:
     runs-on: ubuntu-24.04-arm
