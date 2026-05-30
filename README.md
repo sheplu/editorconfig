@@ -1,5 +1,10 @@
 # editorconfig
 
+[![npm version](https://img.shields.io/npm/v/@sheplu/editorconfig.svg)](https://www.npmjs.com/package/@sheplu/editorconfig)
+[![Quality gates](https://github.com/sheplu/editorconfig/actions/workflows/quality-gates.yaml/badge.svg)](https://github.com/sheplu/editorconfig/actions/workflows/quality-gates.yaml)
+[![Node.js](https://img.shields.io/node/v/@sheplu/editorconfig.svg)](https://nodejs.org)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 A small CLI to manage a **consistent `.editorconfig`** across your projects.
 
 - ✅ Generate a sane default `.editorconfig` in seconds

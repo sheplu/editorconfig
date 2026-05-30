@@ -116,4 +116,4 @@ jobs:
 
       - name: publish
         run: |
-          npm publish --access public
+          npm publish --access public --provenance
