@@ -218,17 +218,17 @@ Tests live under `test/` and are split by scope:
 `node-pty` ships a native binding that npm normally compiles via a postinstall script. This repo sets `ignore-scripts=true` in `.npmrc`, so after `npm install` you need to build it once:
 
 ```bash
-npm run rebuild:native
+node --run rebuild:native
 ```
 
 Run them with:
 
 ```bash
-npm test                  # everything
-npm run test:unit         # unit only — runs in ~50ms
-npm run test:integration  # integration only — spawns the CLI
-npm run test:coverage.    # coverage with 95% threshold
-npm run lint              # oxlint
+node --run test             # everything
+node --run test:unit        # unit only — runs in ~50ms
+node --run test:integration # integration only — spawns the CLI
+node --run test:coverage    # coverage with 95% threshold
+node --run lint             # oxlint
 ```
 
 CI runs lint, audit, and the full suite on every PR across Node 24 / 26.
