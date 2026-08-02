@@ -55,9 +55,10 @@ export function printHelp() {
 Commands:
   write    Create a .editorconfig file with the selected language sections
   check    Validate per-section against the canonical templates
+  fix      Show differences and interactively apply fixes
 
 Options:
-  -m, --mode       Command to run (write | check)
+  -m, --mode       Command to run (write | check | fix)
   -p, --path       Path to the .editorconfig file, or start directory when used with --recursive (default: .editorconfig / cwd)
   -l, --languages  Comma-separated language sections (write: which to emit; check: required set; recursive: enforced on root only)
   -o, --overwrite  Overwrite an existing .editorconfig without confirmation
@@ -78,7 +79,9 @@ Examples:
   editorconfig --mode=check --strict             # fail on any unknown section header
   editorconfig --mode=check --recursive          # validate every .editorconfig under cwd (monorepo)
   editorconfig --mode=check --template=./team.editorconfig
-  editorconfig --mode=check --template=https://team.example.com/.editorconfig`);
+  editorconfig --mode=check --template=https://team.example.com/.editorconfig
+  editorconfig --mode=fix                        # show diff and prompt before fixing
+  editorconfig --mode=fix --overwrite            # apply fixes without prompting`);
 };
 
 function formatCliError(error) {

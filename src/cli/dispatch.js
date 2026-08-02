@@ -4,6 +4,7 @@ import { NO_LANGUAGE_FILTER, runCheck } from '../check.js';
 import { runCheckRecursive } from '../check-recursive.js';
 import { logger } from '../utils/logger.js';
 import { NOT_PROVIDED, parseLanguages } from './options.js';
+import { runFix } from './fix-flow.js';
 import { runWrite } from './write-flow.js';
 
 const OVERRIDES_FAILED = Symbol('overrides-failed');
@@ -74,17 +75,46 @@ async function handleWrite({ path, overwrite, languages, overrides, recursive, j
 	await dispatchWrite({ path, overwrite, languages, overrides });
 }
 
-async function runCommand({ mode, path, overwrite, languages, strict, overrides, recursive, json }) {
-	if (mode === 'write') {
-		await handleWrite({ path, overwrite, languages, overrides, recursive, json });
+async function dispatchFix({ path, overwrite, languages, overrides }) {
+	try {
+		await runFix({ path, overwrite, parsedLanguages: languages, overrides });
+	}
+	catch (error) {
+		logger.error(error.message);
+		process.exitCode = 1;
+	}
+}
+
+async function handleFix({ path, overwrite, languages, overrides, recursive, json }) {
+	if (recursive) {
+		logger.error('--recursive (-r) is only supported with --mode=check');
+		process.exitCode = 1;
 		return;
 	}
-	if (mode === 'check') {
-		dispatchCheck({ path, languages, strict, overrides, recursive, json });
+	if (json) {
+		logger.error('--json is only supported with --mode=check');
+		process.exitCode = 1;
 		return;
 	}
+	await dispatchFix({ path, overwrite, languages, overrides });
+}
+
+function reportInvalidCommand() {
 	logger.error('invalid command');
 	process.exitCode = 1;
+}
+
+function runCommand({ mode, path, overwrite, languages, strict, overrides, recursive, json }) {
+	if (mode === 'write') {
+		return handleWrite({ path, overwrite, languages, overrides, recursive, json });
+	}
+	if (mode === 'check') {
+		return dispatchCheck({ path, languages, strict, overrides, recursive, json });
+	}
+	if (mode === 'fix') {
+		return handleFix({ path, overwrite, languages, overrides, recursive, json });
+	}
+	reportInvalidCommand();
 }
 
 export async function dispatchValues(values) {

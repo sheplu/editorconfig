@@ -13,7 +13,9 @@
 		"test": "node --test",
 		"test:coverage": "node --test --experimental-test-coverage --test-coverage-lines=95 --test-coverage-branches=95 --test-coverage-functions=95",
 		"test:unit": "node --test 'test/unit/*.test.js'",
-		"test:integration": "node --test 'test/integration/*.test.js'"
+		"test:integration": "node --test 'test/integration/*.test.js'",
+		"test:e2e": "node --test 'test/e2e/*.test.js'",
+		"test:smoke": "node --test 'test/smoke/*.test.js'"
 	},
 	"bin": {
 		"@sheplu/editorconfig": "index.js"

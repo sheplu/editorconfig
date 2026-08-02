@@ -114,6 +114,7 @@ describe('appendChunk', () => {
 		);
 		assert.equal(cancelled, true);
 	});
+
 });
 
 describe('consumeStream', () => {
@@ -144,6 +145,7 @@ describe('consumeStream', () => {
 			/exceeds 1 MB limit/u,
 		);
 	});
+
 });
 
 describe('readBoundedBody', () => {
