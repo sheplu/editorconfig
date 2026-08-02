@@ -7,10 +7,6 @@ const MAX_REDIRECTS = 5;
 const HTTP_REDIRECT_MIN = 300;
 const HTTP_REDIRECT_MAX = 400;
 
-function ignoreCancelError() {
-	return false;
-}
-
 export function isRedirect(status) {
 	return status >= HTTP_REDIRECT_MIN && status < HTTP_REDIRECT_MAX;
 }
@@ -37,8 +33,10 @@ export function decodeChunks(chunks) {
 export function appendChunk({ state, value, reader, url }) {
 	state.total += value.byteLength;
 	if (state.total > MAX_BYTES) {
-		// We're about to throw rejectOversized; swallow any cancel() rejection.
-		reader.cancel().catch(ignoreCancelError);
+		// Swallow any cancel() rejection — we are about to throw.
+		reader.cancel().catch(() => {
+			// A cancel() rejection may occur while aborting an oversized body; the error is irrelevant here.
+		});
 		rejectOversized(url);
 	}
 	state.chunks.push(value);

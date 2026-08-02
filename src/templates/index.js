@@ -234,7 +234,7 @@ function bodyAfterHeader(template) {
 	return template.slice(headerEnd + 1);
 }
 
-function bodyAfterFirstHeader(template) {
+export function bodyAfterFirstHeader(template) {
 	const lines = template.split('\n');
 	const headerIndex = lines.findIndex((line) => /^\[.*\]$/u.test(line.trim()));
 	if (headerIndex === -1) {
