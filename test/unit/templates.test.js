@@ -5,8 +5,9 @@ import {
 	ALIASES,
 	AVAILABLE_LANGUAGES,
 	composeEditorConfig,
-	editorconfigContent,
 } from '../../src/templates/index.js';
+
+const editorconfigContent = composeEditorConfig(AVAILABLE_LANGUAGES);
 
 const TEMPLATES = [
 	{ name: 'base', header: '[*]' },
@@ -188,8 +189,17 @@ describe('composeEditorConfig — errors and identity', () => {
 		);
 	});
 
-	it('produces editorconfigContent when given AVAILABLE_LANGUAGES', () => {
-		assert.equal(composeEditorConfig(AVAILABLE_LANGUAGES), editorconfigContent);
+	it('defaults to the default preset when the overrides carry none', () => {
+		const withDefaultPreset = {
+			bodies: new Map(),
+			rawSections: new Map(),
+			hasRoot: false,
+			preset: 'default',
+		};
+		assert.equal(
+			composeEditorConfig(AVAILABLE_LANGUAGES),
+			composeEditorConfig(AVAILABLE_LANGUAGES, withDefaultPreset),
+		);
 	});
 });
 

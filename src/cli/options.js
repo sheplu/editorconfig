@@ -3,6 +3,7 @@ import { parseArgs } from 'node:util';
 import {
 	ALIASES,
 	AVAILABLE_LANGUAGES,
+	AVAILABLE_PRESETS,
 } from '../templates/index.js';
 import { logger } from '../utils/logger.js';
 
@@ -17,6 +18,7 @@ export const options = {
 	template: { type: 'string', short: 't' },
 	recursive: { type: 'boolean', short: 'r' },
 	json: { type: 'boolean' },
+	preset: { type: 'string' },
 };
 
 export function printVersion() {
@@ -50,7 +52,7 @@ function formatAliasList() {
 }
 
 export function printHelp() {
-	logger.log(`Usage: editorconfig --mode=<command> [--path=<path>] [--languages=<list>] [--template=<path|url>] [--recursive] [--json]
+	logger.log(`Usage: editorconfig --mode=<command> [--path=<path>] [--languages=<list>] [--preset=<name>] [--template=<path|url>] [--recursive] [--json]
 
 Commands:
   write    Create a .editorconfig file with the selected language sections
@@ -63,6 +65,7 @@ Options:
   -l, --languages  Comma-separated language sections (write: which to emit; check: required set; recursive: enforced on root only)
   -o, --overwrite  Overwrite an existing .editorconfig without confirmation
   -s, --strict     Treat unknown section headers as failures (check only)
+      --preset     Built-in template preset to generate and validate against (default | minimal)
   -t, --template   Path or https URL to a custom .editorconfig-syntax file whose sections override the built-in ones
   -r, --recursive  Check only. Walk the start directory and validate every .editorconfig (root + children) with cascade checks
       --json       Emit check results as JSON instead of human-readable text (check only)
@@ -71,9 +74,11 @@ Options:
 
 Languages: ${AVAILABLE_LANGUAGES.join(', ')}
 Aliases:   ${formatAliasList()}
+Presets:   ${AVAILABLE_PRESETS.join(', ')}
 
 Examples:
   editorconfig --mode=write --languages=js,md
+  editorconfig --mode=write --preset=minimal     # trimmed template (universal keys only)
   editorconfig --mode=write                       # interactive in TTY, base only otherwise
   editorconfig --mode=check --languages=js,md    # require exactly base + js + md
   editorconfig --mode=check --strict             # fail on any unknown section header

@@ -9,6 +9,7 @@ charset = utf-8
 spelling_language = en
 trim_trailing_whitespace = true
 insert_final_newline = true
+max_line_length = 120
 quote_type = single
 spaces_around_operators = true
 `;
@@ -26,6 +27,7 @@ charset = utf-8
 spelling_language = en
 trim_trailing_whitespace = true
 insert_final_newline = true
+max_line_length = 120
 quote_type = single
 spaces_around_operators = true
 `;
@@ -34,6 +36,21 @@ export const TWO_SPACE_BASE_FILE = `root = true
 
 [*]
 ${TWO_SPACE_BASE_BODY}`;
+
+// Mirrors templates/minimal.js — the trimmed base emitted by --preset=minimal.
+export const MINIMAL_BASE_BODY = `indent_style = tab
+indent_size = 4
+tab_width = 4
+end_of_line = lf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+`;
+
+export const MINIMAL_BASE_FILE = `root = true
+
+[*]
+${MINIMAL_BASE_BODY}`;
 
 export const PYTHON_SECTION = `[*.py]
 indent_style = space
@@ -68,6 +85,7 @@ spelling_language=en
 # a comment
 trim_trailing_whitespace=true
 insert_final_newline = true
+max_line_length=120
 quote_type=single
 spaces_around_operators=true
 

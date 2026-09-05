@@ -115,6 +115,30 @@ describe('smoke: --mode=check', () => {
 	});
 });
 
+describe('smoke: --preset', () => {
+	it('write --preset=default exits 0', () => {
+		assert.equal(run(['--mode=write', `--path=${state.target}`, '--preset=default']).status, 0);
+	});
+
+	it('write --preset=minimal exits 0', () => {
+		assert.equal(run(['--mode=write', `--path=${state.target}`, '--preset=minimal']).status, 0);
+	});
+
+	it('write → check roundtrip with --preset=minimal exits 0', () => {
+		assert.equal(run(['--mode=write', `--path=${state.target}`, '--preset=minimal']).status, 0);
+		assert.equal(run(['--mode=check', `--path=${state.target}`, '--preset=minimal']).status, 0);
+	});
+
+	it('fix --preset=minimal --overwrite exits 0', () => {
+		writeValid();
+		assert.equal(run(['--mode=fix', `--path=${state.target}`, '--preset=minimal', '--overwrite']).status, 0);
+	});
+
+	it('--preset=nope exits non-zero', () => {
+		assert.notEqual(run(['--mode=write', `--path=${state.target}`, '--preset=nope']).status, 0);
+	});
+});
+
 describe('smoke: --mode=fix', () => {
 	it('exits 0 on a correct file', () => {
 		writeValid();

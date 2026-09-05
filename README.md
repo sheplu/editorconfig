@@ -9,6 +9,7 @@ A small CLI to manage a **consistent `.editorconfig`** across your projects.
 
 - ✅ Generate a sane default `.editorconfig` in seconds
 - ✅ Check if your existing file matches the target setup
+- ✅ Pick a built-in preset (`default` or `minimal`) via `--preset` — used by write, check, and fix alike
 - ✅ Confirm before overwriting an existing `.editorconfig` (or pass `--overwrite` to skip the prompt)
 - ✅ Override the built-in template with a team-shared file via `--template` (local path or `https://` URL)
 - ✅ Validate every `.editorconfig` in a monorepo at once with `--recursive`
@@ -99,6 +100,7 @@ charset = utf-8
 spelling_language = en
 trim_trailing_whitespace = true
 insert_final_newline = true
+max_line_length = 120
 quote_type = single
 spaces_around_operators = true
 ```
@@ -146,6 +148,7 @@ Flag interactions in recursive mode:
 - `--path` becomes the start directory for the walk (default: cwd).
 - `--languages` is enforced on the root file only — children may add or omit language sections freely.
 - `--template` overrides apply to the root section comparison.
+- `--preset` selects the built-in baseline the root file is compared against.
 - `--strict` fails on unknown headers in any file.
 
 Exit codes: `0` on pass (warnings allowed), `1` if any file fails or any cross-file failure (e.g. child-root) is detected.
@@ -160,6 +163,25 @@ npx @sheplu/editorconfig --mode=check --recursive --path=./packages/web
 # CI: enforce js/md sections on the root, anywhere else may add what they need
 npx @sheplu/editorconfig --mode=check --recursive --languages=js,md
 ```
+
+### `--preset` (built-in presets)
+
+`write`, `check` (including `--recursive`), and `fix` accept a `--preset` flag selecting which built-in template set to generate and validate against. When the flag is omitted, the `default` preset is used.
+
+Available presets:
+
+- `default` — the full opinionated template shown above (including editor-specific keys like `quote_type` and a `max_line_length = 120` baseline).
+- `minimal` — universal keys only. The `[*]` section keeps `indent_style`, `indent_size`, `tab_width`, `end_of_line`, `charset`, `trim_trailing_whitespace`, and `insert_final_newline`; language sections are trimmed to indent/whitespace basics (no `quote_type`, no `max_line_length`).
+
+```bash
+# generate a trimmed-down .editorconfig
+npx @sheplu/editorconfig --mode=write --preset=minimal --languages=js,py
+
+# validate against the same baseline (a minimal file fails a default check, and vice versa)
+npx @sheplu/editorconfig --mode=check --preset=minimal
+```
+
+An unknown preset name exits non-zero and lists the available presets. `--preset` combines with `--template`: the preset picks the built-in baseline, and any section defined in the custom template overrides it on top.
 
 ### `--template` (custom team template)
 
@@ -244,7 +266,7 @@ npx @sheplu/editorconfig --mode=diff
 
 - [ ] Add diff logic and `diff` command
 - [ ] Add interactive `fix` / `update` command
-- [ ] Expose presets or configuration options
+- [x] Expose presets or configuration options
 
 Additional properties can be found on the [editorconfig wiki](https://github.com/editorconfig/editorconfig/wiki/editorconfig-properties).
 

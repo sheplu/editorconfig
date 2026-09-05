@@ -9,6 +9,7 @@ charset = utf-8
 spelling_language = en
 trim_trailing_whitespace = true
 insert_final_newline = true
+max_line_length = 120
 quote_type = single
 spaces_around_operators = true
 `;

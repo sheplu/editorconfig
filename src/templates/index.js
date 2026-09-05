@@ -1,4 +1,9 @@
 import { base } from './base.js';
+import {
+	DEFAULT_PRESET,
+	LANGUAGE_TEMPLATES,
+	resolvePreset,
+} from './presets.js';
 import { javascript } from './javascript.js';
 import { yaml } from './yaml.js';
 import { markdown } from './markdown.js';
@@ -31,6 +36,12 @@ export {
 	html,
 	css,
 };
+
+export {
+	AVAILABLE_PRESETS,
+	DEFAULT_PRESET,
+	resolvePreset,
+} from './presets.js';
 
 export const AVAILABLE_LANGUAGES = [
 	'javascript',
@@ -72,23 +83,6 @@ export const ALIASES = {
 	less: 'css',
 };
 
-const LANGUAGE_TEMPLATES = {
-	javascript,
-	yaml,
-	markdown,
-	python,
-	go,
-	rust,
-	terraform,
-	json,
-	toml,
-	shell,
-	makefile,
-	dockerfile,
-	html,
-	css,
-};
-
 function joinSections(sections) {
 	return `${sections
 		.map((section) => section.replace(/\n+$/u, ''))
@@ -109,6 +103,7 @@ function pickSection(name, builtin, overrides) {
 }
 
 export function composeEditorConfig(languageNames = [], overrides = EMPTY_OVERRIDES) {
+	const templates = resolvePreset(overrides.preset ?? DEFAULT_PRESET);
 	const resolved = new Set();
 	for (const raw of languageNames) {
 		const name = ALIASES[raw] ?? raw;
@@ -121,13 +116,11 @@ export function composeEditorConfig(languageNames = [], overrides = EMPTY_OVERRI
 	}
 	const ordered = AVAILABLE_LANGUAGES.filter((name) => resolved.has(name));
 	const sections = [
-		pickSection('base', base, overrides),
-		...ordered.map((name) => pickSection(name, LANGUAGE_TEMPLATES[name], overrides)),
+		pickSection('base', templates.base, overrides),
+		...ordered.map((name) => pickSection(name, templates.languages[name], overrides)),
 	];
 	return joinSections(sections);
 }
-
-export const editorconfigContent = composeEditorConfig(AVAILABLE_LANGUAGES);
 
 const BASE_HEADER = '[*]';
 
@@ -247,10 +240,11 @@ export function expectedBodyForLanguage(language, overrides = EMPTY_OVERRIDES) {
 	if (overrides.bodies.has(language)) {
 		return overrides.bodies.get(language);
 	}
+	const templates = resolvePreset(overrides.preset ?? DEFAULT_PRESET);
 	if (language === 'base') {
-		return parseSection(bodyAfterFirstHeader(base));
+		return parseSection(bodyAfterFirstHeader(templates.base));
 	}
-	return parseSection(bodyAfterHeader(LANGUAGE_TEMPLATES[language]));
+	return parseSection(bodyAfterHeader(templates.languages[language]));
 }
 
 export function resolveLanguageNames(languageNames) {
