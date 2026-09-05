@@ -1,4 +1,4 @@
-import { EMPTY_OVERRIDES } from '../templates/index.js';
+import { DEFAULT_PRESET, EMPTY_OVERRIDES, resolvePreset } from '../templates/index.js';
 import { loadCustomTemplate } from '../templates/custom-template.js';
 import { NO_LANGUAGE_FILTER, runCheck } from '../check.js';
 import { runCheckRecursive } from '../check-recursive.js';
@@ -8,6 +8,23 @@ import { runFix } from './fix-flow.js';
 import { runWrite } from './write-flow.js';
 
 const OVERRIDES_FAILED = Symbol('overrides-failed');
+const PRESET_FAILED = Symbol('preset-failed');
+
+function resolvePresetName(presetValue) {
+	if (typeof presetValue !== 'string') {
+		return DEFAULT_PRESET;
+	}
+	const name = presetValue.trim().toLowerCase();
+	try {
+		resolvePreset(name);
+		return name;
+	}
+	catch (error) {
+		logger.error(error.message);
+		process.exitCode = 1;
+		return PRESET_FAILED;
+	}
+}
 
 async function resolveOverrides(templateValue) {
 	if (typeof templateValue !== 'string') {
@@ -21,6 +38,15 @@ async function resolveOverrides(templateValue) {
 		process.exitCode = 1;
 		return OVERRIDES_FAILED;
 	}
+}
+
+function withPreset(overrides, preset) {
+	return {
+		bodies: overrides.bodies,
+		rawSections: overrides.rawSections,
+		hasRoot: overrides.hasRoot,
+		preset,
+	};
 }
 
 function resolveCheckPath(values) {
@@ -118,6 +144,10 @@ function runCommand({ mode, path, overwrite, languages, strict, overrides, recur
 }
 
 export async function dispatchValues(values) {
+	const preset = resolvePresetName(values.preset);
+	if (preset === PRESET_FAILED) {
+		return;
+	}
 	const overrides = await resolveOverrides(values.template);
 	if (overrides === OVERRIDES_FAILED) {
 		return;
@@ -128,7 +158,7 @@ export async function dispatchValues(values) {
 		overwrite: values.overwrite,
 		languages: parseLanguages(values.languages),
 		strict: values.strict,
-		overrides,
+		overrides: withPreset(overrides, preset),
 		recursive: Boolean(values.recursive),
 		json: Boolean(values.json),
 	});

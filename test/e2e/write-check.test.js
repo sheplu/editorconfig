@@ -184,6 +184,32 @@ describe('e2e: write → check with --template', () => {
 	});
 });
 
+describe('e2e: write → check → fix with --preset', () => {
+	it('minimal roundtrip: write passes check and fix finds nothing', () => {
+		const written = runWrite(state.target, 'js,py', '--preset=minimal');
+		assert.equal(written.status, 0, written.stderr);
+		assertPasses(runCheck(state.target, '--preset=minimal'));
+
+		const fixed = runCli(['--mode=fix', `--path=${state.target}`, '--preset=minimal', '--overwrite']);
+		assert.equal(fixed.status, 0, fixed.stderr);
+		assert.match(fixed.stdout, /Nothing to fix\./u);
+	});
+
+	it('a default-written file converges to minimal via fix --preset=minimal', () => {
+		runWrite(state.target, 'js');
+		const fixed = runCli(['--mode=fix', `--path=${state.target}`, '--preset=minimal', '--overwrite']);
+		assert.equal(fixed.status, 0, fixed.stderr);
+		assertPasses(runCheck(state.target, '--preset=minimal'));
+	});
+
+	it('a minimal file fails the default check', () => {
+		runWrite(state.target, '', '--preset=minimal');
+		const checked = runCheck(state.target);
+		assert.notEqual(checked.status, 0);
+		assert.match(checked.stdout, /FAIL/u);
+	});
+});
+
 describe('e2e: check --json pipeline', () => {
 	it('write → check --json produces parseable JSON with ok=true', () => {
 		runCli(['--mode=write', `--path=${state.target}`, '--languages=js']);

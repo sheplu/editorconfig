@@ -39,6 +39,7 @@ describe('check --json', () => {
 		assert.equal(checked.status, 0, checked.stderr);
 		const payload = JSON.parse(checked.stdout);
 		assert.equal(payload.mode, 'check');
+		assert.equal(payload.preset, 'default');
 		assert.equal(payload.ok, true);
 		assert.equal(payload.path, state.target);
 		assert.ok(Array.isArray(payload.sections));
@@ -90,6 +91,7 @@ describe('check --recursive --json', () => {
 		assert.equal(checked.status, 0, checked.stderr);
 		const payload = JSON.parse(checked.stdout);
 		assert.equal(payload.recursive, true);
+		assert.equal(payload.preset, 'default');
 		assert.equal(payload.ok, true);
 		assert.equal(payload.files.length, 2);
 		assert.deepEqual(payload.files.map((file) => file.role).toSorted(), ['child', 'root']);
@@ -111,6 +113,7 @@ describe('check --recursive --json', () => {
 		assert.equal(checked.status, 0, checked.stderr);
 		const payload = JSON.parse(checked.stdout);
 		assert.equal(payload.ok, true);
+		assert.equal(payload.preset, 'default');
 		assert.deepEqual(payload.files, []);
 		assert.deepEqual(payload.crossFileIssues, []);
 	});

@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import {
 	BASE_SECTION_HEADER,
 	compareSection,
+	DEFAULT_PRESET,
 	EMPTY_OVERRIDES,
 	expectedBodyForLanguage,
 	headerToLanguage,
@@ -220,21 +221,23 @@ export function reportToSections(report) {
 	}));
 }
 
-export function buildCheckJson({ path, report, failed }) {
+export function buildCheckJson({ path, report, failed, preset = DEFAULT_PRESET }) {
 	return {
 		mode: 'check',
 		path,
+		preset,
 		ok: !failed,
 		summary: summarizeReport(report),
 		sections: reportToSections(report),
 	};
 }
 
-export function runCheck({ path, parsedLanguages, strict, overrides, json }) {
+export function runCheck({ path, parsedLanguages, strict, overrides = EMPTY_OVERRIDES, json }) {
 	const report = compareEditorConfig(path, parsedLanguages, overrides);
 	const failed = reportIsFailing(report, strict);
 	if (json) {
-		logger.log(JSON.stringify(buildCheckJson({ path, report, failed }), identityReplacer, 2));
+		const preset = overrides.preset ?? DEFAULT_PRESET;
+		logger.log(JSON.stringify(buildCheckJson({ path, report, failed, preset }), identityReplacer, 2));
 	}
 	else {
 		printReport(path, report);

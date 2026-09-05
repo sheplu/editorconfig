@@ -2,6 +2,7 @@ import { existsSync, statSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 import { discoverEditorConfigs } from './discover.js';
 import { classify, crossFileIssues } from './cascade.js';
+import { DEFAULT_PRESET, EMPTY_OVERRIDES } from './templates/index.js';
 import {
 	compareEditorConfigForRole,
 	identityReplacer,
@@ -215,12 +216,13 @@ function jsonCrossIssue(issue, startDir) {
 	return copy;
 }
 
-function buildRecursiveJson({ allEntries, allCrossIssues, strict, startDir }) {
+function buildRecursiveJson({ allEntries, allCrossIssues, strict, startDir, preset }) {
 	const summary = formatGlobalSummary({ entries: allEntries, crossIssues: allCrossIssues, strict });
 	return {
 		mode: 'check',
 		recursive: true,
 		startDir,
+		preset,
 		ok: !summary.failed,
 		files: allEntries.map((entry) => jsonFileEntry(entry, startDir, strict)),
 		crossFileIssues: allCrossIssues.map((issue) => jsonCrossIssue(issue, startDir)),
@@ -239,19 +241,19 @@ function reportRecursiveJson(payload) {
 	}
 }
 
-function emitEmptyRecursiveJson(startDir) {
-	emitJson({ mode: 'check', recursive: true, startDir, ok: true, files: [], crossFileIssues: [] });
+function emitEmptyRecursiveJson(startDir, preset) {
+	emitJson({ mode: 'check', recursive: true, startDir, preset, ok: true, files: [], crossFileIssues: [] });
 }
 
-function reportEmpty(startDir, json) {
+function reportEmpty(startDir, json, preset) {
 	if (json) {
-		emitEmptyRecursiveJson(startDir);
+		emitEmptyRecursiveJson(startDir, preset);
 		return;
 	}
 	logger.log(`No .editorconfig files found under ${startDir}`);
 }
 
-function runWalk({ startDir, paths, parsedLanguages, strict, overrides, json }) {
+function runWalk({ startDir, paths, parsedLanguages, strict, overrides, json, preset }) {
 	const { allEntries, allCrossIssues } = gatherAll({
 		trees: classify(paths),
 		parsedLanguages,
@@ -260,18 +262,19 @@ function runWalk({ startDir, paths, parsedLanguages, strict, overrides, json }) 
 		json,
 	});
 	if (json) {
-		reportRecursiveJson({ allEntries, allCrossIssues, strict, startDir });
+		reportRecursiveJson({ allEntries, allCrossIssues, strict, startDir, preset });
 		return;
 	}
 	reportAndExit({ allEntries, allCrossIssues, strict, startDir });
 }
 
-export function runCheckRecursive({ startDir: rawStart, parsedLanguages, strict, overrides, json }) {
+export function runCheckRecursive({ startDir: rawStart, parsedLanguages, strict, overrides = EMPTY_OVERRIDES, json }) {
 	const startDir = resolveStartDir(rawStart);
+	const preset = overrides.preset ?? DEFAULT_PRESET;
 	const paths = discoverEditorConfigs(startDir);
 	if (paths.length === 0) {
-		reportEmpty(startDir, json);
+		reportEmpty(startDir, json, preset);
 		return;
 	}
-	runWalk({ startDir, paths, parsedLanguages, strict, overrides, json });
+	runWalk({ startDir, paths, parsedLanguages, strict, overrides, json, preset });
 }
