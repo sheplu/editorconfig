@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { realpathSync } from 'node:fs';
 import { compareEditorConfig } from './src/check.js';
 import { parseCliArgs, printHelp, printVersion } from './src/cli/options.js';
 import { dispatchValues } from './src/cli/dispatch.js';
@@ -24,6 +25,17 @@ async function main() {
 	await dispatchValues(parsed.values);
 };
 
-if (process.argv[1] === import.meta.filename) {
+export function isCliInvocation() {
+	// Npm installs the bin as a symlink: argv[1] is the link while
+	// `import.meta.filename` is its resolved target, so realpath both sides.
+	try {
+		return realpathSync(process.argv[1]) === import.meta.filename;
+	}
+	catch {
+		return false;
+	}
+}
+
+if (isCliInvocation()) {
 	await main();
 }
