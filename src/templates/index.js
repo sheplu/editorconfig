@@ -4,6 +4,7 @@ import {
 	LANGUAGE_TEMPLATES,
 	resolvePreset,
 } from './presets.js';
+import { bodyAfterFirstHeader, bodyAfterHeader, parseSection } from './parser.js';
 import { javascript } from './javascript.js';
 import { yaml } from './yaml.js';
 import { markdown } from './markdown.js';
@@ -42,6 +43,14 @@ export {
 	DEFAULT_PRESET,
 	resolvePreset,
 } from './presets.js';
+
+export {
+	bodyAfterFirstHeader,
+	collectDiagnostics,
+	compareSection,
+	parseSection,
+	parseSections,
+} from './parser.js';
 
 export const AVAILABLE_LANGUAGES = [
 	'javascript',
@@ -134,106 +143,6 @@ const HEADER_TO_LANGUAGE = new Map(
 
 export function headerToLanguage(header) {
 	return HEADER_TO_LANGUAGE.get(header);
-}
-
-function isIgnoredLine(line) {
-	if (line === '' || line.startsWith('#') || line.startsWith(';')) {
-		return true;
-	}
-	if (line.startsWith('[') && line.endsWith(']')) {
-		return true;
-	}
-	return false;
-}
-
-function applyKeyValue(body, line) {
-	const equalsAt = line.indexOf('=');
-	if (equalsAt === -1) {
-		return;
-	}
-	const key = line.slice(0, equalsAt).trim().toLowerCase();
-	if (key.length === 0) {
-		return;
-	}
-	body.set(key, line.slice(equalsAt + 1).trim());
-}
-
-export function parseSection(block) {
-	const body = new Map();
-	for (const rawLine of block.split('\n')) {
-		const line = rawLine.trim();
-		if (!isIgnoredLine(line)) {
-			applyKeyValue(body, line);
-		}
-	}
-	return body;
-}
-
-function finishSection({ header, lines }) {
-	return {
-		header,
-		body: parseSection(lines.join('\n')),
-	};
-}
-
-function processLine(state, line) {
-	const trimmed = line.trim();
-	if (/^\[.*\]$/u.test(trimmed)) {
-		if (state.current) {
-			state.sections.push(finishSection(state.current));
-		}
-		state.current = { header: trimmed, lines: [] };
-	}
-	else if (state.current) {
-		state.current.lines.push(line);
-	}
-	else {
-		state.preamble.push(line);
-	}
-}
-
-function splitSections(lines) {
-	const state = { sections: [], preamble: [], current: false };
-	for (const line of lines) {
-		processLine(state, line);
-	}
-	if (state.current) {
-		state.sections.push(finishSection(state.current));
-	}
-	return { sections: state.sections, preamble: state.preamble };
-}
-
-export function parseSections(text) {
-	const normalized = text.replaceAll(/\r\n?/gu, '\n');
-	const { sections, preamble } = splitSections(normalized.split('\n'));
-	const hasRoot = preamble.some((line) => /^\s*root\s*=\s*true\s*$/iu.test(line));
-	return { hasRoot, sections };
-}
-
-export function compareSection(actualBody, expectedBody) {
-	if (actualBody.size !== expectedBody.size) {
-		return { ok: false };
-	}
-	for (const [key, value] of expectedBody) {
-		if (!actualBody.has(key) || actualBody.get(key) !== value) {
-			return { ok: false };
-		}
-	}
-	return { ok: true };
-}
-
-function bodyAfterHeader(template) {
-	const headerEnd = template.indexOf('\n');
-	return template.slice(headerEnd + 1);
-}
-
-export function bodyAfterFirstHeader(template) {
-	const lines = template.split('\n');
-	const headerIndex = lines.findIndex((line) => /^\[.*\]$/u.test(line.trim()));
-	if (headerIndex === -1) {
-		return template;
-	}
-	return lines.slice(headerIndex + 1).join('\n');
 }
 
 export function expectedBodyForLanguage(language, overrides = EMPTY_OVERRIDES) {

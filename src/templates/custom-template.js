@@ -109,9 +109,23 @@ function buildRawSections(bodies, text) {
 	return rawSections;
 }
 
+function formatDiagnostic(diagnostic) {
+	return `line ${diagnostic.line}: '${diagnostic.text}'`;
+}
+
+function rejectInvalidLines(path, diagnostics) {
+	if (diagnostics.length === 0) {
+		return;
+	}
+	throw new Error(
+		`custom template '${path}' has invalid lines: ${diagnostics.map((diagnostic) => formatDiagnostic(diagnostic)).join('; ')}`,
+	);
+}
+
 export async function loadCustomTemplate(input) {
 	const text = await readTemplateText(input);
 	const parsed = parseSections(text);
+	rejectInvalidLines(input, parsed.diagnostics);
 	const bodies = buildBodies(input, parsed.sections);
 	if (bodies.has('base') && !parsed.hasRoot) {
 		throw new Error(
