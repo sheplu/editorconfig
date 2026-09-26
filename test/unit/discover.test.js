@@ -40,8 +40,8 @@ describe('discoverEditorConfigs — symlinks', () => {
 		writeFileSync(join(state.workdir, 'real', '.editorconfig'), 'root = true\n', 'utf8');
 		symlinkSync(join(state.workdir, 'real'), join(state.workdir, 'linked'), 'dir');
 
-		const found = discoverEditorConfigs(state.workdir);
-		assert.deepEqual(found, [join(state.workdir, 'real', '.editorconfig')]);
+		const { paths } = discoverEditorConfigs(state.workdir);
+		assert.deepEqual(paths, [join(state.workdir, 'real', '.editorconfig')]);
 	});
 });
 
@@ -61,7 +61,8 @@ describe('discoverEditorConfigs — unreadable directories', () => {
 		const locked = setupLockedDir();
 		try {
 			const { result, captured } = captureWarnings(() => discoverEditorConfigs(state.workdir));
-			assert.deepEqual(result, [join(state.workdir, '.editorconfig')]);
+			assert.deepEqual(result.paths, [join(state.workdir, '.editorconfig')]);
+			assert.deepEqual(result.skippedDirs, [locked], 'the unreadable subdirectory must be recorded');
 			assert.equal(captured.length, 1);
 			assert.match(captured[0], /Skipping unreadable directory/u);
 		}
@@ -75,8 +76,9 @@ describe('discoverEditorConfigs — non-editorconfig files', () => {
 	it('skips regular files whose name is not .editorconfig', () => {
 		writeFileSync(join(state.workdir, 'README.md'), '# hi\n', 'utf8');
 		writeFileSync(join(state.workdir, '.editorconfig'), 'root = true\n', 'utf8');
-		const found = discoverEditorConfigs(state.workdir);
-		assert.deepEqual(found, [join(state.workdir, '.editorconfig')]);
+		const { paths, skippedDirs } = discoverEditorConfigs(state.workdir);
+		assert.deepEqual(paths, [join(state.workdir, '.editorconfig')]);
+		assert.deepEqual(skippedDirs, []);
 	});
 });
 
@@ -87,8 +89,8 @@ describe('discoverEditorConfigs — ignored directories', () => {
 			const buried = join(state.workdir, ignored, 'pkg');
 			mkdirSync(buried, { recursive: true });
 			writeFileSync(join(buried, '.editorconfig'), '[*]\nindent_style = tab\n', 'utf8');
-			const found = discoverEditorConfigs(state.workdir);
-			assert.deepEqual(found, [join(state.workdir, '.editorconfig')]);
+			const { paths } = discoverEditorConfigs(state.workdir);
+			assert.deepEqual(paths, [join(state.workdir, '.editorconfig')]);
 		});
 	}
 });
@@ -106,7 +108,7 @@ describe('discoverEditorConfigs — deterministic ordering', () => {
 		const second = discoverEditorConfigs(state.workdir);
 		assert.deepEqual(first, second);
 		assert.deepEqual(
-			first.map((entry) => entry.replace(`${state.workdir}/`, '')),
+			first.paths.map((entry) => entry.replace(`${state.workdir}/`, '')),
 			[
 				'.editorconfig',
 				'pkg-1/.editorconfig',
@@ -116,5 +118,22 @@ describe('discoverEditorConfigs — deterministic ordering', () => {
 				'pkg-9/.editorconfig',
 			],
 		);
+	});
+});
+
+describe('discoverEditorConfigs — unreadable start directory', () => {
+	it('throws instead of returning a successful empty scan', { skip: SKIP_LOCKED }, () => {
+		const locked = setupLockedDir();
+		chmodSync(state.workdir, 0o000);
+		try {
+			assert.throws(
+				() => discoverEditorConfigs(state.workdir),
+				/cannot read start directory/u,
+			);
+		}
+		finally {
+			chmodSync(state.workdir, 0o755);
+			chmodSync(locked, 0o755);
+		}
 	});
 });

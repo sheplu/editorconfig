@@ -101,6 +101,7 @@ describe('e2e: monorepo recursive JSON output', () => {
 		assert.ok(json.files.length >= 2, 'expected at least root + child entries');
 		assert.ok(json.files.some((file) => file.role === 'root'));
 		assert.ok(json.files.some((file) => file.role === 'child'));
+		assert.deepEqual(json.skippedDirs, [], 'a fully readable scan reports no skipped directories');
 	});
 
 	it('reports child-root failure in JSON cross-file issues', () => {
