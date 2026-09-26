@@ -140,11 +140,11 @@ Compares the existing file the same way `check` does, prints the differences, an
 What a fix does to the file:
 
 - Sections whose body already matches are kept **verbatim**, comments included; only drifted or missing sections are regenerated from the template.
-- Preamble comments are preserved above the (single) `root = true` line.
-- Unknown sections are removed, invalid lines are dropped, and sections are reordered to the canonical layout (`[*]` first) — all of it shown in the preview.
+- Preamble comments are preserved above the (single) `root = true` line; stray `key = value` pairs sitting outside any section (which editors ignore) are removed and listed in the preview.
+- Unknown sections are removed, invalid lines are dropped, duplicated headers are consolidated into one canonical section, and sections are reordered to the canonical layout (`[*]` first) — all of it shown in the preview.
 - Comments inside a regenerated section cannot be kept; the preview lists each one as `- # … (comment will be removed)` before you confirm.
 
-Safety: the preview is re-validated before writing — if the file changed while the confirmation prompt was open, the fix aborts with exit 1 instead of overwriting the concurrent edit. Writes are atomic (temp file + rename), so a failed write never destroys the previous configuration. Ctrl-D at the prompt cancels cleanly with exit 1.
+Safety: the preview is re-validated before writing — if the file changed while the confirmation prompt was open, the fix aborts with exit 1 instead of overwriting the concurrent edit. Writes are atomic (temp file + rename), so a failed write never destroys the previous configuration. Ctrl-D or Ctrl-C at the prompt cancels cleanly with exit 1.
 
 ### `--recursive` (monorepo check)
 

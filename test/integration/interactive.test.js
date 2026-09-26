@@ -204,3 +204,11 @@ describe('write mode overwrite prompt — EOF', () => {
 			});
 	});
 });
+
+describe('write mode language prompt — Ctrl-C', () => {
+	it('cancels with exit 1 and writes nothing', () => expectPromptOutput('\u0003', ({ exitCode, output }) => {
+		assert.equal(exitCode, 1, `expected a clean cancellation, got exit ${exitCode}:\n${output}`);
+		assert.match(output, /Cancelled/u);
+		assert.equal(existsSync(state.target), false);
+	}));
+});

@@ -26,10 +26,10 @@ async function main() {
 };
 
 export function isCliInvocation() {
-	// Npm installs the bin as a symlink: argv[1] is the link while
-	// `import.meta.filename` is its resolved target, so realpath both sides.
+	// Npm installs the bin as a symlink, and --preserve-symlinks-main keeps the module URL unresolved.
+	// Realpath both sides so every invocation style compares equal.
 	try {
-		return realpathSync(process.argv[1]) === import.meta.filename;
+		return realpathSync(process.argv[1]) === realpathSync(import.meta.filename);
 	}
 	catch {
 		return false;

@@ -1,12 +1,40 @@
-import { existsSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import { basename, dirname, join } from 'node:path';
+import { existsSync, lstatSync, readlinkSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
+
+const MAX_LINK_DEPTH = 40;
+
+function isSymlink(path) {
+	try {
+		return lstatSync(path).isSymbolicLink();
+	}
+	catch {
+		return false;
+	}
+}
+
+function readLinkTarget(path) {
+	const target = readlinkSync(path);
+	if (isAbsolute(target)) {
+		return target;
+	}
+	return resolve(dirname(path), target);
+}
+
+function resolveDanglingLink(path) {
+	// A dangling symlink has no realpath, but writeFileSync still follows it and creates its target — do the same.
+	let current = path;
+	for (let depth = 0; depth < MAX_LINK_DEPTH && isSymlink(current); depth += 1) {
+		current = readLinkTarget(current);
+	}
+	return current;
+}
 
 function resolveTarget(path) {
 	// Write through symlinks, matching plain writeFileSync behavior.
 	if (existsSync(path)) {
 		return realpathSync(path);
 	}
-	return path;
+	return resolveDanglingLink(path);
 }
 
 const TIMESTAMP_RADIX = 36;

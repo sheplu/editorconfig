@@ -204,7 +204,7 @@ export function summarizeReport(report) {
 	return { total, matched, failed, unknown };
 }
 
-function pluralize(count, singular) {
+export function pluralize(count, singular) {
 	if (count === 1) {
 		return singular;
 	}

@@ -88,3 +88,52 @@ describe('buildSectionDiffs — missing root display (all base statuses)', () =>
 		assert.match(output, /\+ root = true \(missing preamble\)/u);
 	});
 });
+
+describe('buildSectionDiffs — stray preamble pairs', () => {
+	it('reports non-root preamble pairs as removable stray entries', () => {
+		const parsed = parseSections(`root = true\ncharset = latin1\n\n[*]\n${BUILTIN_BASE_BODY}`);
+		const diffs = buildSectionDiffs(parsed, [], EMPTY_OVERRIDES);
+		const stray = diffs.find((diff) => diff.status === 'stray');
+		assert.ok(stray, 'expected a stray-preamble diff entry');
+		assert.equal(stray.header, 'preamble');
+		assert.deepEqual(stray.keys.removed, [{ key: 'charset', value: 'latin1' }]);
+		assert.equal(hasChanges(diffs), true);
+	});
+
+	it('renders the stray pairs in the formatted diff', () => {
+		const parsed = parseSections(`root = true\ncharset = latin1\n\n[*]\n${BUILTIN_BASE_BODY}`);
+		const diffs = buildSectionDiffs(parsed, [], EMPTY_OVERRIDES);
+		const output = formatDiff(diffs, '.editorconfig');
+		assert.match(output, /preamble — stray pairs outside any section \(will be removed\)/u);
+		assert.match(output, /- charset = latin1/u);
+	});
+
+	it('does not flag a preamble that only declares root', () => {
+		const parsed = parseSections(`root = true\n\n[*]\n${BUILTIN_BASE_BODY}`);
+		const diffs = buildSectionDiffs(parsed, [], EMPTY_OVERRIDES);
+		assert.equal(diffs.some((diff) => diff.status === 'stray'), false);
+		assert.equal(hasChanges(diffs), false);
+	});
+});
+
+describe('buildSectionDiffs — duplicate headers', () => {
+	it('marks every occurrence of a duplicated header for consolidation', () => {
+		const parsed = parseSections(`root = true\n\n[*]\n${BUILTIN_BASE_BODY}\n${PYTHON_SECTION}\n${PYTHON_SECTION}`);
+		const diffs = buildSectionDiffs(parsed, ['python'], EMPTY_OVERRIDES);
+		const duplicates = diffs.filter((diff) => diff.duplicate);
+		assert.equal(duplicates.length, 2, 'both [*.py] occurrences must be flagged');
+		for (const diff of duplicates) {
+			assert.equal(diff.status, 'mismatch');
+			assert.equal(diff.bodyMatches, false, 'duplicates must never be preserved verbatim');
+		}
+		assert.equal(hasChanges(diffs), true);
+		const output = formatDiff(diffs, '.editorconfig');
+		assert.match(output, /duplicate header \(will be consolidated/u);
+	});
+
+	it('leaves unique sections untouched by duplicate detection', () => {
+		const parsed = parseSections(`root = true\n\n[*]\n${BUILTIN_BASE_BODY}\n${PYTHON_SECTION}`);
+		const diffs = buildSectionDiffs(parsed, ['python'], EMPTY_OVERRIDES);
+		assert.equal(diffs.some((diff) => diff.duplicate), false);
+	});
+});

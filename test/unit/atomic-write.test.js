@@ -77,3 +77,25 @@ describe('writeFileAtomic', () => {
 		assert.deepEqual(readdirSync(state.workdir), ['.editorconfig'], 'no temp file may remain');
 	});
 });
+
+describe('writeFileAtomic — dangling symlinks', () => {
+	it('writes through a dangling symlink instead of replacing it', { skip: SKIP_SYMLINK }, () => {
+		const target = join(state.workdir, 'shared.editorconfig');
+		const link = join(state.workdir, 'link.editorconfig');
+		symlinkSync(target, link);
+		writeFileAtomic(link, 'root = true\n');
+		assert.equal(readFileSync(target, 'utf8'), 'root = true\n', 'the link target must be created');
+		assert.equal(statSync(link).isFile(), true);
+		assert.equal(realpathSync(link), realpathSync(target), 'the symlink must survive the write');
+	});
+
+	it('follows a chain of dangling relative symlinks like writeFileSync does', { skip: SKIP_SYMLINK }, () => {
+		const link = join(state.workdir, 'first.editorconfig');
+		const middle = join(state.workdir, 'second.editorconfig');
+		symlinkSync('second.editorconfig', link);
+		symlinkSync('final.editorconfig', middle);
+		writeFileAtomic(link, 'root = true\n');
+		assert.equal(readFileSync(join(state.workdir, 'final.editorconfig'), 'utf8'), 'root = true\n');
+		assert.equal(realpathSync(link), realpathSync(join(state.workdir, 'final.editorconfig')));
+	});
+});

@@ -1,4 +1,4 @@
-import { reportIsFailing, summarizeReport } from './check.js';
+import { pluralize, reportIsFailing, summarizeReport } from './check.js';
 
 function aggregateCounts(entries, strict) {
 	const totals = { matched: 0, failed: 0, unknown: 0, filesFailed: 0 };
@@ -12,13 +12,6 @@ function aggregateCounts(entries, strict) {
 		}
 	}
 	return totals;
-}
-
-function pluralize(count, singular) {
-	if (count === 1) {
-		return singular;
-	}
-	return `${singular}s`;
 }
 
 function directoryNoun(count) {
