@@ -121,6 +121,31 @@ This command will:
   - `0` if everything matches
   - `1` if differences are found
 
+Beyond per-section bodies, `check` also enforces:
+
+- **Syntax**: lines that are neither a comment, a `[header]`, nor a `key = value` pair fail the check (regardless of `--strict`) and are reported with their line number. `--strict` additionally fails on unknown-but-well-formed section headers.
+- **Section order**: `[*]` must come before the language sections. EditorConfig gives later matching sections precedence, so a base section declared after `[*.md]` would silently override the markdown settings.
+- **Root precedence**: the last `root` declaration in the preamble wins (`root = true` followed by `root = false` is *not* a root file).
+- **Value casing**: values of the standard keys (`indent_style`, `indent_size`, `end_of_line`, `charset`, `trim_trailing_whitespace`, `insert_final_newline`) are compared case-insensitively, like the EditorConfig core parsers read them — `indent_style = TAB` matches `tab`.
+
+### `fix`
+
+```bash
+npx @sheplu/editorconfig --mode=fix              # show the diff and prompt before applying
+npx @sheplu/editorconfig --mode=fix --overwrite  # apply without prompting
+```
+
+Compares the existing file the same way `check` does, prints the differences, and rewrites the file to the canonical layout after confirmation. Language sections are auto-detected from the file; `--languages` adds sections on top of the detected set, and `--template` / `--preset` change the baseline being enforced.
+
+What a fix does to the file:
+
+- Sections whose body already matches are kept **verbatim**, comments included; only drifted or missing sections are regenerated from the template.
+- Preamble comments are preserved above the (single) `root = true` line.
+- Unknown sections are removed, invalid lines are dropped, and sections are reordered to the canonical layout (`[*]` first) — all of it shown in the preview.
+- Comments inside a regenerated section cannot be kept; the preview lists each one as `- # … (comment will be removed)` before you confirm.
+
+Safety: the preview is re-validated before writing — if the file changed while the confirmation prompt was open, the fix aborts with exit 1 instead of overwriting the concurrent edit. Writes are atomic (temp file + rename), so a failed write never destroys the previous configuration. Ctrl-D at the prompt cancels cleanly with exit 1.
+
 ### `--recursive` (monorepo check)
 
 ```bash
@@ -141,7 +166,11 @@ Cross-file checks emitted on top of per-file validation:
 - `redundant` — a child redeclares a parent key/value verbatim (**warn**).
 - `contradiction` — a child reuses the same header as its root (e.g. both `[*]`) with a different value (**warn**). Different globs like child `[*.js]` overriding root `[*]` are silent — they are legitimate per spec.
 
-Skipped during the walk: `node_modules`, `.git`, `dist`, `build`, `coverage`, `.next`, `.cache`, and symlinked directories.
+Skipped during the walk: `node_modules`, `.git`, `dist`, `build`, `coverage`, `.next`, `.cache`, and symlinked directories (files and directories alike).
+
+Unreadable directories: a permission error on the **start directory** is a hard error (exit 1) — an empty result must not pass as a successful validation. Unreadable descendants are skipped with a warning on stderr, counted in the summary, and listed in the `skippedDirs` field of the `--json` payload so consumers can tell complete validation from partial coverage.
+
+`--languages` is validated up front: a typo like `--languages=typoscript` fails with exit 1 even when the walk finds no files.
 
 Flag interactions in recursive mode:
 
@@ -228,7 +257,7 @@ Single-file shape:
 }
 ```
 
-In `--recursive` mode the payload instead carries `recursive: true`, a `files` array (each with its `role`, `summary`, and `sections`) and a `crossFileIssues` array describing `child-root` / `redundant` / `contradiction` findings. When no JSON output is requested, the human-readable report is printed exactly as before.
+In `--recursive` mode the payload instead carries `recursive: true`, a `files` array (each with its `role`, `summary`, and `sections`), a `crossFileIssues` array describing `child-root` / `redundant` / `contradiction` findings, and a `skippedDirs` array listing directories the walk could not read (empty on a fully readable scan). When no JSON output is requested, the human-readable report is printed exactly as before.
 
 `--json` is only meaningful for `check`; combining it with `--mode=write` is rejected with a non-zero exit.
 
@@ -250,13 +279,7 @@ Prints the full usage, the available commands, and every supported option.
 
 ## Planned / Upcoming Features
 
-### 1. Interactive update / replace
-
-```bash
-npx @sheplu/editorconfig --mode=fix
-```
-
-### 2. Compare with target setup
+### 1. Compare with target setup
 
 ```bash
 npx @sheplu/editorconfig --mode=diff
@@ -265,7 +288,7 @@ npx @sheplu/editorconfig --mode=diff
 ## Roadmap
 
 - [ ] Add diff logic and `diff` command
-- [ ] Add interactive `fix` / `update` command
+- [x] Add interactive `fix` command
 - [x] Expose presets or configuration options
 
 Additional properties can be found on the [editorconfig wiki](https://github.com/editorconfig/editorconfig/wiki/editorconfig-properties).

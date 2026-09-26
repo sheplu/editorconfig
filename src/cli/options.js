@@ -80,7 +80,7 @@ Examples:
   editorconfig --mode=write --languages=js,md
   editorconfig --mode=write --preset=minimal     # trimmed template (universal keys only)
   editorconfig --mode=write                       # interactive in TTY, base only otherwise
-  editorconfig --mode=check --languages=js,md    # require exactly base + js + md
+  editorconfig --mode=check --languages=js,md    # require base + js + md sections to be present
   editorconfig --mode=check --strict             # fail on any unknown section header
   editorconfig --mode=check --recursive          # validate every .editorconfig under cwd (monorepo)
   editorconfig --mode=check --template=./team.editorconfig
