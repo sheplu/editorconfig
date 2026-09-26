@@ -5,7 +5,7 @@
 import { afterEach, beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -203,6 +203,29 @@ describe('smoke: check negative', () => {
 	it('--languages=foobar exits non-zero', () => {
 		writeValid();
 		assert.notEqual(run(['--mode=check', `--path=${state.target}`, '--languages=foobar']).status, 0);
+	});
+});
+
+describe('smoke: symlinked bin invocation', { skip: process.platform === 'win32' }, () => {
+	function runViaSymlink(args) {
+		const link = join(state.workdir, 'editorconfig-link');
+		symlinkSync(cliEntry, link);
+		return spawnSync(process.execPath, [link, ...args], {
+			encoding: 'utf8',
+			stdio: ['ignore', 'pipe', 'pipe'],
+			cwd: state.workdir,
+		});
+	}
+
+	it('--version via a bin-style symlink exits 0 with non-empty stdout', () => {
+		const result = runViaSymlink(['--version']);
+		assert.equal(result.status, 0);
+		assert.ok(result.stdout.trim().length > 0);
+	});
+
+	it('check on a missing file via a bin-style symlink exits non-zero', () => {
+		const result = runViaSymlink(['--mode=check', `--path=${state.target}`]);
+		assert.notEqual(result.status, 0);
 	});
 });
 
