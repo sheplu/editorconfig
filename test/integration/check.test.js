@@ -94,6 +94,31 @@ describe('check (inferred mode) — base requirements', () => {
 	});
 });
 
+describe('check (inferred mode) — section order', () => {
+	it('FAILs when a language section precedes [*], even with canonical bodies', () => {
+		writeSubset('md');
+		const [preamble, baseSection, ...rest] = readFileSync(state.target, 'utf8').split('\n\n');
+		const reordered = [preamble, ...rest.map((part) => part.trimEnd()), baseSection].join('\n\n');
+		writeFileSync(state.target, `${reordered}\n`, 'utf8');
+
+		const checked = runCli(['--mode=check', `--path=${state.target}`, '--strict']);
+		assert.notEqual(checked.status, 0);
+		assert.match(checked.stdout, /\bFAIL\b/u);
+		assert.match(checked.stdout, /must come before language sections/u);
+	});
+
+	it('reports the out-of-order status in the --json payload', () => {
+		writeSubset('md');
+		const [preamble, baseSection, ...rest] = readFileSync(state.target, 'utf8').split('\n\n');
+		writeFileSync(state.target, `${[preamble, ...rest.map((part) => part.trimEnd()), baseSection].join('\n\n')}\n`, 'utf8');
+
+		const checked = runCli(['--mode=check', `--path=${state.target}`, '--json']);
+		assert.notEqual(checked.status, 0);
+		const payload = JSON.parse(checked.stdout);
+		assert.ok(payload.sections.some((section) => section.status === 'out-of-order'));
+	});
+});
+
 describe('check (inferred mode) — invalid syntax', () => {
 	it('FAILs on an unclosed section header even without --strict', () => {
 		writeSubset('');

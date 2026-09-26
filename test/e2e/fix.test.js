@@ -110,6 +110,22 @@ describe('e2e: write → tamper → fix → check roundtrip', () => {
 	});
 });
 
+describe('e2e: fix normalizes section order', () => {
+	it('write → move [*] after [*.md] → check fails → fix reorders → check passes', () => {
+		assert.equal(runWrite(state.target, 'js,md').status, 0);
+		assertPasses(runCheck(state.target));
+
+		const [preamble, baseSection, ...rest] = readFileSync(state.target, 'utf8').split('\n\n');
+		writeFileSync(state.target, `${[preamble, ...rest.map((part) => part.trimEnd()), baseSection].join('\n\n')}\n`, 'utf8');
+		assertFails(runCheck(state.target));
+
+		assert.equal(runFix(state.target, '--overwrite').status, 0);
+		assertPasses(runCheck(state.target));
+		const fixed = readFileSync(state.target, 'utf8');
+		assert.ok(fixed.indexOf('[*]') < fixed.indexOf('[*.md]'), '[*] must come first after fix');
+	});
+});
+
 describe('e2e: fix adds missing language sections', () => {
 	it('adds a language requested via --languages and check --languages passes', () => {
 		// Write base only

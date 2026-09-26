@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import {
 	BASE_SECTION_HEADER,
+	baseSectionOutOfOrder,
 	compareSection,
 	DEFAULT_PRESET,
 	EMPTY_OVERRIDES,
@@ -19,6 +20,7 @@ const STATUS_GLYPH = {
 	mismatch: '❌',
 	missing: '❌',
 	'no-root': '❌',
+	'out-of-order': '❌',
 	'child-root-forbidden': '❌',
 	invalid: '❌',
 	unknown: '⚠️ ',
@@ -29,12 +31,20 @@ const STATUS_DETAIL = {
 	mismatch: 'section body does not match',
 	missing: 'missing',
 	'no-root': "missing 'root = true' before sections",
+	'out-of-order': "'[*]' must come before language sections (later sections win)",
 	'child-root-forbidden': "child file must not declare 'root = true'",
 	invalid: 'invalid line (expected comment, [header], or key = value)',
 	unknown: 'unknown header (not validated)',
 };
 
-const FAILING_STATUSES = new Set(['mismatch', 'missing', 'no-root', 'child-root-forbidden', 'invalid']);
+const FAILING_STATUSES = new Set([
+	'mismatch',
+	'missing',
+	'no-root',
+	'out-of-order',
+	'child-root-forbidden',
+	'invalid',
+]);
 
 function languageForHeader(header) {
 	if (header === BASE_SECTION_HEADER) {
@@ -60,8 +70,9 @@ function checkSection(section, overrides, role) {
 }
 
 function buildExpectedHeaders(parsedLanguages) {
+	// The base section is owned by buildRootBaseIssues — listing it here too double-reports a missing [*].
 	const resolved = resolveLanguageNames(parsedLanguages);
-	return [BASE_SECTION_HEADER, ...resolved.map((name) => languageToHeader(name))];
+	return resolved.map((name) => languageToHeader(name));
 }
 
 function buildResults({ parsedLanguages, parsed, overrides, role }) {
@@ -86,6 +97,9 @@ function buildRootBaseIssues(parsed) {
 	}
 	else if (!parsed.hasRoot) {
 		issues.push({ header: BASE_SECTION_HEADER, status: 'no-root' });
+	}
+	else if (baseSectionOutOfOrder(parsed.sections)) {
+		issues.push({ header: BASE_SECTION_HEADER, status: 'out-of-order' });
 	}
 	return issues;
 }
