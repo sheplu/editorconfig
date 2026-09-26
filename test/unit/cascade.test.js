@@ -71,6 +71,26 @@ indent_style = tab
 
 });
 
+describe('crossFileIssues — value normalization', () => {
+	it('classifies case-only differences of standard values as redundant, not contradiction', () => {
+		const root = parse(`root = true
+
+[*]
+indent_style = tab
+`);
+		const child = parse(`[*]
+indent_style = Tab
+`);
+		const issues = crossFileIssues({
+			rootParsed: root,
+			childParsed: child,
+			childPath: '/x/.editorconfig',
+		});
+		assert.equal(issues.length, 1);
+		assert.equal(issues[0].kind, 'redundant');
+	});
+});
+
 describe('crossFileIssues — sort order', () => {
 	it('sorts key issues across different headers alphabetically', () => {
 		const root = parse(`root = true

@@ -20,6 +20,7 @@ const STATUS_GLYPH = {
 	missing: '❌',
 	'no-root': '❌',
 	'child-root-forbidden': '❌',
+	invalid: '❌',
 	unknown: '⚠️ ',
 };
 
@@ -29,10 +30,11 @@ const STATUS_DETAIL = {
 	missing: 'missing',
 	'no-root': "missing 'root = true' before sections",
 	'child-root-forbidden': "child file must not declare 'root = true'",
+	invalid: 'invalid line (expected comment, [header], or key = value)',
 	unknown: 'unknown header (not validated)',
 };
 
-const FAILING_STATUSES = new Set(['mismatch', 'missing', 'no-root', 'child-root-forbidden']);
+const FAILING_STATUSES = new Set(['mismatch', 'missing', 'no-root', 'child-root-forbidden', 'invalid']);
 
 function languageForHeader(header) {
 	if (header === BASE_SECTION_HEADER) {
@@ -95,6 +97,13 @@ function buildChildBaseIssues(parsed) {
 	return [];
 }
 
+function buildSyntaxIssues(parsed) {
+	return parsed.diagnostics.map(({ line, text }) => ({
+		header: `line ${line}: '${text}'`,
+		status: 'invalid',
+	}));
+}
+
 function buildBaseIssuesForRole(parsed, role) {
 	if (role === 'child') {
 		return buildChildBaseIssues(parsed);
@@ -114,22 +123,27 @@ export function compareEditorConfigForRole({
 	const text = readFileSync(path, 'utf8');
 	const parsed = parseSections(text);
 	const baseIssues = buildBaseIssuesForRole(parsed, role);
-	let effectiveLanguages = parsedLanguages;
-	if (role === 'child') {
-		effectiveLanguages = NO_LANGUAGE_FILTER;
-	}
+	const syntaxIssues = buildSyntaxIssues(parsed);
+	const effectiveLanguages = effectiveLanguagesForRole(parsedLanguages, role);
 	const results = buildResults({ parsedLanguages: effectiveLanguages, parsed, overrides, role });
-	return { baseIssues, results, parsed };
+	return { baseIssues, syntaxIssues, results, parsed };
+}
+
+function effectiveLanguagesForRole(parsedLanguages, role) {
+	if (role === 'child') {
+		return NO_LANGUAGE_FILTER;
+	}
+	return parsedLanguages;
 }
 
 export function compareEditorConfig(path = '.editorconfig', parsedLanguages = NO_LANGUAGE_FILTER, overrides = EMPTY_OVERRIDES) {
-	const { baseIssues, results } = compareEditorConfigForRole({
+	const { baseIssues, syntaxIssues, results } = compareEditorConfigForRole({
 		path,
 		parsedLanguages,
 		overrides,
 		role: 'root',
 	});
-	return { baseIssues, results };
+	return { baseIssues, syntaxIssues, results };
 }
 
 function formatLine({ header, status }) {
@@ -141,9 +155,13 @@ function formatLine({ header, status }) {
 	return `  ${glyph} ${header}`;
 }
 
-export function reportIsFailing({ baseIssues, results }, strict) {
-	const failing = [...baseIssues, ...results].some((entry) => FAILING_STATUSES.has(entry.status));
-	const hasUnknown = results.some((entry) => entry.status === 'unknown');
+function reportLines(report) {
+	return [...(report.syntaxIssues ?? []), ...report.baseIssues, ...report.results];
+}
+
+export function reportIsFailing(report, strict) {
+	const failing = reportLines(report).some((entry) => FAILING_STATUSES.has(entry.status));
+	const hasUnknown = report.results.some((entry) => entry.status === 'unknown');
 	return failing || Boolean(strict && hasUnknown);
 }
 
@@ -157,17 +175,14 @@ function buildHeading(displayPath, label) {
 export function printReport(displayPath, report, { label } = {}) {
 	logger.log(buildHeading(displayPath, label));
 	logger.log('');
-	for (const issue of report.baseIssues) {
-		logger.log(formatLine(issue));
-	}
-	for (const entry of report.results) {
-		logger.log(formatLine(entry));
+	for (const line of reportLines(report)) {
+		logger.log(formatLine(line));
 	}
 	logger.log('');
 }
 
 export function summarizeReport(report) {
-	const lines = [...report.baseIssues, ...report.results];
+	const lines = reportLines(report);
 	const total = lines.length;
 	const matched = lines.filter((entry) => entry.status === 'match').length;
 	const failed = lines.filter((entry) => FAILING_STATUSES.has(entry.status)).length;
@@ -214,7 +229,7 @@ export function identityReplacer(_key, value) {
 }
 
 export function reportToSections(report) {
-	return [...report.baseIssues, ...report.results].map(({ header, status }) => ({
+	return reportLines(report).map(({ header, status }) => ({
 		header,
 		status,
 		detail: STATUS_DETAIL[status],

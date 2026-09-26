@@ -197,6 +197,38 @@ indent_size = 2
 	});
 });
 
+describe('loadCustomTemplate — invalid syntax', () => {
+	it('rejects an HTML page instead of treating it as an empty template', async () => {
+		write(`<!DOCTYPE html>
+<html>
+<head><title>Login</title></head>
+<body><h1>Please log in</h1></body>
+</html>
+`);
+		await assert.rejects(
+			loadCustomTemplate(state.file),
+			/has invalid lines: line 1: '<!DOCTYPE html>'/u,
+		);
+	});
+
+	it('rejects a valid template with an appended unclosed header line', async () => {
+		write(`root = true
+
+[*]
+indent_style = space
+[unclosed
+`);
+		await assert.rejects(loadCustomTemplate(state.file), /invalid lines: line 5: '\[unclosed'/u);
+	});
+
+	it('still accepts a comment-only template', async () => {
+		write('# nothing to override yet\n; reserved for future use\n');
+		const overrides = await loadCustomTemplate(state.file);
+		assert.equal(overrides.bodies.size, 0);
+		assert.equal(overrides.hasRoot, false);
+	});
+});
+
 describe('loadCustomTemplate — URL input', () => {
 	it('loads via the URL branch with stubbed fetch', async () => {
 		const original = globalThis.fetch;

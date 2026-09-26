@@ -152,7 +152,8 @@ describe('compareSection', () => {
 	it('returns ok when both maps are empty', () => {
 		assert.equal(compareSection(new Map(), new Map()).ok, true);
 	});
-	it('compares values case-sensitively (catches a typo like Space vs space)', () => {
+	it('compares raw values case-sensitively (normalization happens in parseSection)', () => {
+		// Note: parseSection lowercases standard-key values; 'Space' here means the caller bypassed the parser.
 		const actual = new Map([['indent_style', 'Space']]);
 		const expected = new Map([['indent_style', 'space']]);
 		assert.equal(compareSection(actual, expected).ok, false);

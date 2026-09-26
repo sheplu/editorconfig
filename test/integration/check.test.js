@@ -94,6 +94,29 @@ describe('check (inferred mode) — base requirements', () => {
 	});
 });
 
+describe('check (inferred mode) — invalid syntax', () => {
+	it('FAILs on an unclosed section header even without --strict', () => {
+		writeSubset('');
+		appendFileSync(state.target, '[unclosed\n', 'utf8');
+		const checked = runCli(['--mode=check', `--path=${state.target}`]);
+		assert.notEqual(checked.status, 0);
+		assert.match(checked.stdout, /\bFAIL\b/u);
+		assert.match(checked.stdout, /invalid line/u);
+	});
+
+	it('reports the invalid line in the --json payload', () => {
+		writeSubset('');
+		appendFileSync(state.target, 'garbage line\n', 'utf8');
+		const checked = runCli(['--mode=check', `--path=${state.target}`, '--json']);
+		assert.notEqual(checked.status, 0);
+		const payload = JSON.parse(checked.stdout);
+		assert.equal(payload.ok, false);
+		const invalid = payload.sections.filter((section) => section.status === 'invalid');
+		assert.equal(invalid.length, 1);
+		assert.match(invalid[0].header, /garbage line/u);
+	});
+});
+
 describe('check (inferred mode) — unknown headers', () => {
 	it('warns and PASSes when a custom header is present (no --strict)', () => {
 		writeSubset('');

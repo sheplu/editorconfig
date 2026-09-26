@@ -128,6 +128,28 @@ describe('buildSectionDiffs — unknown and combined drift', () => {
 	});
 });
 
+describe('buildSectionDiffs — invalid lines', () => {
+	it('reports invalid lines as a removable diff entry', () => {
+		const text = `${BUILTIN_BASE_FILE}[unclosed\n`;
+		const parsed = parseSections(text);
+		const diffs = buildSectionDiffs(parsed, [], EMPTY_OVERRIDES);
+		const invalidDiff = diffs.find((diff) => diff.status === 'invalid');
+		assert.ok(invalidDiff, 'expected an invalid-lines diff entry');
+		assert.equal(invalidDiff.lines.length, 1);
+		assert.equal(invalidDiff.lines[0].text, '[unclosed');
+		assert.equal(hasChanges(diffs), true);
+	});
+
+	it('renders invalid lines in the formatted diff', () => {
+		const text = `${BUILTIN_BASE_FILE}[unclosed\n`;
+		const parsed = parseSections(text);
+		const diffs = buildSectionDiffs(parsed, [], EMPTY_OVERRIDES);
+		const output = formatDiff(diffs, '.editorconfig');
+		assert.match(output, /invalid \(will be removed\)/u);
+		assert.match(output, /- line \d+: \[unclosed/u);
+	});
+});
+
 describe('hasChanges', () => {
 	it('returns false when all diffs are match', () => {
 		const diffs = [{ status: 'match' }, { status: 'match' }];

@@ -121,9 +121,18 @@ function markRootMissing(diffs) {
 	}
 }
 
+function appendInvalidLines(diffs, parsed) {
+	const diagnostics = parsed.diagnostics ?? [];
+	if (diagnostics.length === 0) {
+		return;
+	}
+	diffs.push({ header: 'invalid lines', status: 'invalid', lines: diagnostics });
+}
+
 export function buildSectionDiffs(parsed, targetLanguages, overrides) {
 	const diffs = parsed.sections.map((section) => buildSectionDiff(section, overrides));
 	appendMissingSections(diffs, parsed, targetLanguages);
+	appendInvalidLines(diffs, parsed);
 	if (!parsed.hasRoot) {
 		markRootMissing(diffs);
 	}
@@ -152,12 +161,14 @@ function formatKeyDiff(keys) {
 const STATUS_LABELS = {
 	mismatch: 'mismatch',
 	missing: 'missing (will be added)',
+	invalid: 'invalid (will be removed)',
 	unknown: 'unknown (will be removed)',
 };
 
 const STATUS_GLYPHS = {
 	mismatch: '❌',
 	missing: '➕',
+	invalid: '❌',
 	unknown: '⚠️ ',
 };
 
@@ -170,11 +181,19 @@ function appendSectionLines(diff, lines) {
 		lines.push("    + root = true (missing preamble)");
 	}
 
+	if (diff.lines) {
+		lines.push(...formatInvalidLines(diff.lines));
+	}
+
 	if (diff.keys) {
 		lines.push(...formatKeyDiff(diff.keys));
 	}
 
 	lines.push('');
+}
+
+function formatInvalidLines(invalidLines) {
+	return invalidLines.map(({ line, text }) => `    - line ${line}: ${text}`);
 }
 
 export function formatDiff(diffs, displayPath) {

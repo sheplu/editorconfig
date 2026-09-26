@@ -175,4 +175,20 @@ indent_style = space
 		assert.notEqual(result.status, 0);
 		assert.match(result.stderr, /unknown header '\[\*\.proto\]'/u);
 	});
+
+	it('exits non-zero when the template is an HTML page (e.g. a captive error page)', () => {
+		writeFileSync(state.template, `<!DOCTYPE html>
+<html>
+<head><title>Login</title></head>
+<body><h1>Please log in</h1></body>
+</html>
+`, 'utf8');
+		const result = runCli([
+			'--mode=write',
+			`--path=${state.target}`,
+			`--template=${state.template}`,
+		]);
+		assert.notEqual(result.status, 0);
+		assert.match(result.stderr, /invalid lines/u);
+	});
 });
