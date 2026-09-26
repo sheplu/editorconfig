@@ -2,7 +2,7 @@ import { existsSync, statSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 import { discoverEditorConfigs } from './discover.js';
 import { classify, crossFileIssues } from './cascade.js';
-import { DEFAULT_PRESET, EMPTY_OVERRIDES } from './templates/index.js';
+import { DEFAULT_PRESET, EMPTY_OVERRIDES, resolveLanguageNames } from './templates/index.js';
 import {
 	compareEditorConfigForRole,
 	identityReplacer,
@@ -13,6 +13,7 @@ import {
 	summarizeReport,
 } from './check.js';
 import { logger } from './utils/logger.js';
+import { formatGlobalSummary } from './recursive-summary.js';
 
 function resolveStartDir(rawPath) {
 	const abs = resolve(rawPath);
@@ -105,66 +106,6 @@ function printCrossFileBlock(issues, startDir) {
 	logger.log('');
 }
 
-function aggregateCounts(entries, strict) {
-	const totals = { matched: 0, failed: 0, unknown: 0, filesFailed: 0 };
-	for (const entry of entries) {
-		const counts = summarizeReport(entry.report);
-		totals.matched += counts.matched;
-		totals.failed += counts.failed;
-		totals.unknown += counts.unknown;
-		if (reportIsFailing(entry.report, strict)) {
-			totals.filesFailed += 1;
-		}
-	}
-	return totals;
-}
-
-function pluralize(count, singular) {
-	if (count === 1) {
-		return singular;
-	}
-	return `${singular}s`;
-}
-
-function buildSummaryParts({ fileCount, counts, warnings, crossFailures, strict }) {
-	const parts = [`${fileCount} ${pluralize(fileCount, 'file')} checked`];
-	if (counts.filesFailed > 0) {
-		parts.push(`${counts.filesFailed} failed`);
-	}
-	if (crossFailures > 0) {
-		parts.push(`${crossFailures} cross-file ${pluralize(crossFailures, 'failure')}`);
-	}
-	if (warnings > 0) {
-		parts.push(`${warnings} ${pluralize(warnings, 'warning')}`);
-	}
-	if (counts.unknown > 0 && !strict) {
-		parts.push(`${counts.unknown} unknown ${pluralize(counts.unknown, 'header')} ignored`);
-	}
-	return parts;
-}
-
-function summaryHead(passed) {
-	if (passed) {
-		return '✅ PASS';
-	}
-	return '❌ FAIL';
-}
-
-function formatGlobalSummary({ entries, crossIssues, strict }) {
-	const counts = aggregateCounts(entries, strict);
-	const warnings = crossIssues.filter((issue) => issue.severity === 'warn').length;
-	const crossFailures = crossIssues.filter((issue) => issue.severity === 'fail').length;
-	const passed = counts.filesFailed === 0 && crossFailures === 0;
-	const parts = buildSummaryParts({
-		fileCount: entries.length,
-		counts,
-		warnings,
-		crossFailures,
-		strict,
-	});
-	return { line: `${summaryHead(passed)} — ${parts.join('; ')}`, failed: !passed };
-}
-
 function processTree({ tree, parsedLanguages, overrides, startDir, json }) {
 	const entries = buildFileEntries(tree, parsedLanguages, overrides);
 	const [rootEntry, ...childEntries] = entries;
@@ -188,9 +129,9 @@ function gatherAll({ trees, parsedLanguages, overrides, startDir, json }) {
 	return { allEntries, allCrossIssues };
 }
 
-function reportAndExit({ allEntries, allCrossIssues, strict, startDir }) {
+function reportAndExit({ allEntries, allCrossIssues, strict, startDir, skippedDirs }) {
 	printCrossFileBlock(allCrossIssues, startDir);
-	const summary = formatGlobalSummary({ entries: allEntries, crossIssues: allCrossIssues, strict });
+	const summary = formatGlobalSummary({ entries: allEntries, crossIssues: allCrossIssues, strict, skippedDirs });
 	logger.log(summary.line);
 	if (summary.failed) {
 		process.exitCode = 1;
@@ -216,8 +157,8 @@ function jsonCrossIssue(issue, startDir) {
 	return copy;
 }
 
-function buildRecursiveJson({ allEntries, allCrossIssues, strict, startDir, preset }) {
-	const summary = formatGlobalSummary({ entries: allEntries, crossIssues: allCrossIssues, strict });
+function buildRecursiveJson({ allEntries, allCrossIssues, strict, startDir, preset, skippedDirs }) {
+	const summary = formatGlobalSummary({ entries: allEntries, crossIssues: allCrossIssues, strict, skippedDirs });
 	return {
 		mode: 'check',
 		recursive: true,
@@ -226,6 +167,7 @@ function buildRecursiveJson({ allEntries, allCrossIssues, strict, startDir, pres
 		ok: !summary.failed,
 		files: allEntries.map((entry) => jsonFileEntry(entry, startDir, strict)),
 		crossFileIssues: allCrossIssues.map((issue) => jsonCrossIssue(issue, startDir)),
+		skippedDirs: skippedDirs.map((dir) => displayPath(dir, startDir)),
 	};
 }
 
@@ -241,19 +183,28 @@ function reportRecursiveJson(payload) {
 	}
 }
 
-function emitEmptyRecursiveJson(startDir, preset) {
-	emitJson({ mode: 'check', recursive: true, startDir, preset, ok: true, files: [], crossFileIssues: [] });
+function emitEmptyRecursiveJson({ startDir, preset, skippedDirs }) {
+	emitJson({
+		mode: 'check',
+		recursive: true,
+		startDir,
+		preset,
+		ok: true,
+		files: [],
+		crossFileIssues: [],
+		skippedDirs: skippedDirs.map((dir) => displayPath(dir, startDir)),
+	});
 }
 
-function reportEmpty(startDir, json, preset) {
+function reportEmpty({ startDir, json, preset, skippedDirs }) {
 	if (json) {
-		emitEmptyRecursiveJson(startDir, preset);
+		emitEmptyRecursiveJson({ startDir, preset, skippedDirs });
 		return;
 	}
 	logger.log(`No .editorconfig files found under ${startDir}`);
 }
 
-function runWalk({ startDir, paths, parsedLanguages, strict, overrides, json, preset }) {
+function runWalk({ startDir, paths, skippedDirs, parsedLanguages, strict, overrides, json, preset }) {
 	const { allEntries, allCrossIssues } = gatherAll({
 		trees: classify(paths),
 		parsedLanguages,
@@ -262,19 +213,23 @@ function runWalk({ startDir, paths, parsedLanguages, strict, overrides, json, pr
 		json,
 	});
 	if (json) {
-		reportRecursiveJson({ allEntries, allCrossIssues, strict, startDir, preset });
+		reportRecursiveJson({ allEntries, allCrossIssues, strict, startDir, preset, skippedDirs });
 		return;
 	}
-	reportAndExit({ allEntries, allCrossIssues, strict, startDir });
+	reportAndExit({ allEntries, allCrossIssues, strict, startDir, skippedDirs });
 }
 
-export function runCheckRecursive({ startDir: rawStart, parsedLanguages, strict, overrides = EMPTY_OVERRIDES, json }) {
+export function runCheckRecursive({ startDir: rawStart, parsedLanguages = NO_LANGUAGE_FILTER, strict, overrides = EMPTY_OVERRIDES, json }) {
+	if (parsedLanguages !== NO_LANGUAGE_FILTER) {
+		// Validate the filter up front: an empty scan must not hide a typo (R22).
+		resolveLanguageNames(parsedLanguages);
+	}
 	const startDir = resolveStartDir(rawStart);
 	const preset = overrides.preset ?? DEFAULT_PRESET;
-	const paths = discoverEditorConfigs(startDir);
+	const { paths, skippedDirs } = discoverEditorConfigs(startDir);
 	if (paths.length === 0) {
-		reportEmpty(startDir, json, preset);
+		reportEmpty({ startDir, json, preset, skippedDirs });
 		return;
 	}
-	runWalk({ startDir, paths, parsedLanguages, strict, overrides, json, preset });
+	runWalk({ startDir, paths, skippedDirs, parsedLanguages, strict, overrides, json, preset });
 }

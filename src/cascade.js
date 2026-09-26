@@ -4,10 +4,6 @@ function depthOf(path) {
 	return path.split(sep).length;
 }
 
-function isAncestorDir(ancestor, descendant) {
-	return descendant.startsWith(`${ancestor}${sep}`);
-}
-
 function comparePaths(left, right) {
 	const dl = depthOf(left);
 	const dr = depthOf(right);
@@ -17,21 +13,41 @@ function comparePaths(left, right) {
 	return left.localeCompare(right);
 }
 
-function findClosestAncestor(trees, dir) {
-	return trees.find((tree) => isAncestorDir(dirname(tree.root), dir)) ?? false;
+// Walks the ancestor chain of `dir` against an index of classified root directories.
+// Depth-sorted processing keeps tree roots pairwise non-nested, so at most one ancestor can match.
+// Exact-path lookups also handle the filesystem root, which prefix matching gets wrong ('//').
+function findAncestorTree(rootsByDir, dir) {
+	let current = dirname(dir);
+	for (;;) {
+		const tree = rootsByDir.get(current);
+		if (tree) {
+			return tree;
+		}
+		const parent = dirname(current);
+		if (parent === current) {
+			return false;
+		}
+		current = parent;
+	}
+}
+
+function placePath(path, trees, rootsByDir) {
+	const ancestor = findAncestorTree(rootsByDir, dirname(path));
+	if (ancestor) {
+		ancestor.children.push(path);
+		return;
+	}
+	const tree = { root: path, children: [] };
+	trees.push(tree);
+	rootsByDir.set(dirname(path), tree);
 }
 
 export function classify(paths) {
 	const sorted = paths.toSorted(comparePaths);
 	const trees = [];
+	const rootsByDir = new Map();
 	for (const path of sorted) {
-		const ancestor = findClosestAncestor(trees, dirname(path));
-		if (ancestor) {
-			ancestor.children.push(path);
-		}
-		else {
-			trees.push({ root: path, children: [] });
-		}
+		placePath(path, trees, rootsByDir);
 	}
 	return trees;
 }

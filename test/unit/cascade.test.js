@@ -40,6 +40,23 @@ describe('classify', () => {
 		assert.equal(trees[0].root, top);
 		assert.deepEqual(trees[0].children.toSorted(), [mid, deep].toSorted());
 	});
+
+	it('recognizes a filesystem-root configuration as an ancestor', () => {
+		const rootFile = `${sep}.editorconfig`;
+		const childFile = joinPath(`${sep}project`, '.editorconfig');
+		const trees = classify([rootFile, childFile]);
+		assert.deepEqual(trees, [{ root: rootFile, children: [childFile] }]);
+	});
+
+	it('does not treat a sibling directory sharing a name prefix as an ancestor', () => {
+		const fooFile = joinPath(`${sep}foo`, '.editorconfig');
+		const foobarFile = joinPath(`${sep}foobar`, '.editorconfig');
+		const trees = classify([fooFile, foobarFile]);
+		assert.equal(trees.length, 2);
+		for (const tree of trees) {
+			assert.deepEqual(tree.children, []);
+		}
+	});
 });
 
 describe('crossFileIssues — key-level diffs', () => {

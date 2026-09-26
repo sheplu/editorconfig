@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -97,5 +97,69 @@ describe('check --recursive — symlinked files', () => {
 		// The symlink is not picked up; only the root file is checked.
 		assert.match(res.stdout, /1 file checked/u);
 		assert.doesNotMatch(res.stdout, /pkg\/\.editorconfig/u);
+	});
+});
+
+const SKIP_LOCKED = process.platform === 'win32' || (typeof process.getuid === 'function' && process.getuid() === 0);
+
+describe('check --recursive — unreadable directories', () => {
+	it('fails when the start directory itself is unreadable', { skip: SKIP_LOCKED }, () => {
+		writeFile('locked/.editorconfig', '[unclosed\n');
+		const locked = join(state.workdir, 'locked');
+		chmodSync(locked, 0o000);
+		try {
+			const result = runCli(['--mode=check', '--recursive', `--path=${locked}`, '--json']);
+			assert.notEqual(result.status, 0, 'an unvalidated scan must not succeed');
+			assert.match(result.stderr, /cannot read start directory/u);
+			assert.equal(result.stdout.trim(), '', 'no ok:true payload may be emitted');
+		}
+		finally {
+			chmodSync(locked, 0o755);
+		}
+	});
+
+	function withLockedSubdir(check) {
+		writeFile('.editorconfig', VALID_ROOT);
+		const locked = join(state.workdir, 'locked');
+		mkdirSync(locked, { recursive: true });
+		chmodSync(locked, 0o000);
+		try {
+			check();
+		}
+		finally {
+			chmodSync(locked, 0o755);
+		}
+	}
+
+	it('reports skipped descendant directories in the --json payload', { skip: SKIP_LOCKED }, () => {
+		withLockedSubdir(() => {
+			const result = runCli(['--mode=check', '--recursive', '--json']);
+			assert.equal(result.status, 0, result.stderr);
+			const payload = JSON.parse(result.stdout);
+			assert.equal(payload.ok, true);
+			assert.deepEqual(payload.skippedDirs, ['locked']);
+		});
+	});
+
+	it('mentions skipped directories in the text summary', { skip: SKIP_LOCKED }, () => {
+		withLockedSubdir(() => {
+			const result = runCli(['--mode=check', '--recursive']);
+			assert.equal(result.status, 0, result.stderr);
+			assert.match(result.stdout, /1 unreadable directory skipped/u);
+		});
+	});
+});
+
+describe('check --recursive — language filter validation', () => {
+	it('rejects an unknown language even when the scan finds no files', () => {
+		const result = runCli(['--mode=check', '--recursive', '--languages=typo']);
+		assert.notEqual(result.status, 0);
+		assert.match(result.stderr, /unknown language: 'typo'/u);
+	});
+
+	it('still reports an empty scan for an omitted or empty filter', () => {
+		const empty = runCli(['--mode=check', '--recursive', '--languages=']);
+		assert.equal(empty.status, 0, empty.stderr);
+		assert.match(empty.stdout, /No \.editorconfig files found/u);
 	});
 });

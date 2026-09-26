@@ -14,16 +14,21 @@ export const IGNORED_DIRS = new Set([
 
 const EDITORCONFIG_NAME = '.editorconfig';
 
-function readDir(dir) {
+function readDir(dir, context) {
 	try {
 		return readdirSync(dir, { withFileTypes: true });
 	}
 	catch (error) {
-		if (error.code === 'EACCES' || error.code === 'EPERM') {
-			logger.warn(`Skipping unreadable directory: ${dir}`);
-			return [];
+		if (error.code !== 'EACCES' && error.code !== 'EPERM') {
+			throw error;
 		}
-		throw error;
+		if (dir === context.startDir) {
+			// An unreadable start directory means nothing was validated at all.
+			throw new Error(`cannot read start directory '${dir}': ${error.code}`, { cause: error });
+		}
+		logger.warn(`Skipping unreadable directory: ${dir}`);
+		context.skippedDirs.push(dir);
+		return [];
 	}
 }
 
@@ -43,8 +48,8 @@ function classifyEntry(entry) {
 	return 'skip';
 }
 
-function processDir(dir, stack, found) {
-	for (const entry of readDir(dir)) {
+function processDir({ dir, stack, found, context }) {
+	for (const entry of readDir(dir, context)) {
 		const full = join(dir, entry.name);
 		const action = classifyEntry(entry);
 		if (action === 'descend') {
@@ -58,9 +63,10 @@ function processDir(dir, stack, found) {
 
 export function discoverEditorConfigs(startDir) {
 	const found = [];
+	const context = { startDir, skippedDirs: [] };
 	const stack = [startDir];
 	while (stack.length > 0) {
-		processDir(stack.pop(), stack, found);
+		processDir({ dir: stack.pop(), stack, found, context });
 	}
-	return found.toSorted();
+	return { paths: found.toSorted(), skippedDirs: context.skippedDirs.toSorted() };
 }
