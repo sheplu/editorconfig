@@ -69,6 +69,38 @@ describe('fix mode — applying fixes with --overwrite', () => {
 	});
 });
 
+describe('fix mode — comment handling', () => {
+	it('preserves comments in sections whose body already matches', () => {
+		const tamperedBase = BUILTIN_BASE_FILE.replace('indent_size = 4', 'indent_size = 2');
+		const content = `${tamperedBase}\n[*.py]\n# team policy: black defaults\nindent_style = space\nindent_size = 4\nmax_line_length = 88\n`;
+		writeFileSync(state.target, content, 'utf8');
+		const result = runCli(['--mode=fix', `--path=${state.target}`, '--overwrite']);
+		assert.equal(result.status, 0, result.stderr);
+		const fixed = readFileSync(state.target, 'utf8');
+		assert.match(fixed, /# team policy: black defaults/u, 'matched-section comments must survive');
+		assert.match(fixed, /indent_size = 4/u, 'the base tampering must be fixed');
+	});
+
+	it('discloses comments that a regenerated section will lose', () => {
+		const content = BUILTIN_BASE_FILE
+			.replace('indent_size = 4', 'indent_size = 2')
+			.replace('[*]\n', '[*]\n# keep tabs, see ADR-7\n');
+		writeFileSync(state.target, content, 'utf8');
+		const result = runCli(['--mode=fix', `--path=${state.target}`, '--overwrite']);
+		assert.equal(result.status, 0, result.stderr);
+		assert.match(result.stdout, /- # keep tabs, see ADR-7 \(comment will be removed\)/u);
+		assert.doesNotMatch(readFileSync(state.target, 'utf8'), /ADR-7/u);
+	});
+
+	it('preserves preamble comments above root = true', () => {
+		const content = `# managed centrally\n${BUILTIN_BASE_FILE.replace('indent_size = 4', 'indent_size = 2')}`;
+		writeFileSync(state.target, content, 'utf8');
+		const result = runCli(['--mode=fix', `--path=${state.target}`, '--overwrite']);
+		assert.equal(result.status, 0, result.stderr);
+		assert.match(readFileSync(state.target, 'utf8'), /^# managed centrally\nroot = true\n/u);
+	});
+});
+
 describe('fix mode — non-TTY without --overwrite', () => {
 	it('exits non-zero when differences exist and no --overwrite', () => {
 		const tampered = BUILTIN_BASE_FILE.replace('indent_size = 4', 'indent_size = 2');

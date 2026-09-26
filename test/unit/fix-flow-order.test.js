@@ -56,3 +56,35 @@ describe('buildSectionDiffs — invalid lines', () => {
 	});
 });
 
+
+describe('buildSectionDiffs — missing root display (all base statuses)', () => {
+	it('flags rootMissing on a matching base (status flips to mismatch)', () => {
+		const parsed = parseSections(`[*]\n${BUILTIN_BASE_BODY}`);
+		const diffs = buildSectionDiffs(parsed, [], EMPTY_OVERRIDES);
+		const baseDiff = diffs.find((diff) => diff.header === '[*]');
+		assert.equal(baseDiff.rootMissing, true);
+		assert.equal(baseDiff.status, 'mismatch');
+	});
+
+	it('flags rootMissing on a mismatched base and keeps its key diff', () => {
+		const tampered = BUILTIN_BASE_BODY.replace('indent_size = 4', 'indent_size = 2');
+		const parsed = parseSections(`[*]\n${tampered}`);
+		const diffs = buildSectionDiffs(parsed, [], EMPTY_OVERRIDES);
+		const baseDiff = diffs.find((diff) => diff.header === '[*]');
+		assert.equal(baseDiff.rootMissing, true);
+		assert.equal(baseDiff.status, 'mismatch');
+		assert.ok(baseDiff.keys.changed.length > 0, 'the key diff must survive the root flag');
+		const output = formatDiff(diffs, '.editorconfig');
+		assert.match(output, /\+ root = true \(missing preamble\)/u);
+	});
+
+	it('flags rootMissing on a missing base section', () => {
+		const parsed = parseSections(`${PYTHON_SECTION}`);
+		const diffs = buildSectionDiffs(parsed, ['python'], EMPTY_OVERRIDES);
+		const baseDiff = diffs.find((diff) => diff.header === '[*]');
+		assert.equal(baseDiff.status, 'missing');
+		assert.equal(baseDiff.rootMissing, true);
+		const output = formatDiff(diffs, '.editorconfig');
+		assert.match(output, /\+ root = true \(missing preamble\)/u);
+	});
+});

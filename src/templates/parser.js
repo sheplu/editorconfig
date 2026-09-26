@@ -139,3 +139,59 @@ export function bodyAfterFirstHeader(template) {
 	}
 	return lines.slice(headerIndex + 1).join('\n');
 }
+
+export function fromFirstHeader(text) {
+	const lines = text.split('\n');
+	const headerIndex = lines.findIndex((line) => /^\[.*\]$/u.test(line.trim()));
+	if (headerIndex === -1) {
+		return text;
+	}
+	return lines.slice(headerIndex).join('\n');
+}
+
+export function stripInvalidLines(block) {
+	return block
+		.split('\n')
+		.filter((line) => isValidLine(line.trim()))
+		.join('\n');
+}
+
+const NO_HEADER = '';
+
+function trimTrailingBlankLines(lines) {
+	while (lines.length > 0 && lines.at(-1).trim() === '') {
+		lines.pop();
+	}
+}
+
+function flushRawBlock(state, blocks) {
+	if (state.header === NO_HEADER) {
+		return;
+	}
+	trimTrailingBlankLines(state.lines);
+	blocks.set(state.header, [state.header, ...state.lines].join('\n'));
+}
+
+function processRawLine(state, blocks, line) {
+	const trimmed = line.trim();
+	if (/^\[.*\]$/u.test(trimmed)) {
+		flushRawBlock(state, blocks);
+		state.header = trimmed;
+		state.lines = [];
+		return;
+	}
+	if (state.header !== NO_HEADER) {
+		state.lines.push(line);
+	}
+}
+
+export function extractRawSections(text) {
+	const normalized = text.replaceAll(/\r\n?/gu, '\n');
+	const blocks = new Map();
+	const state = { header: NO_HEADER, lines: [] };
+	for (const line of normalized.split('\n')) {
+		processRawLine(state, blocks, line);
+	}
+	flushRawBlock(state, blocks);
+	return blocks;
+}

@@ -48,8 +48,11 @@ export {
 	bodyAfterFirstHeader,
 	collectDiagnostics,
 	compareSection,
+	extractRawSections,
+	fromFirstHeader,
 	parseSection,
 	parseSections,
+	stripInvalidLines,
 } from './parser.js';
 
 export const AVAILABLE_LANGUAGES = [
@@ -92,7 +95,7 @@ export const ALIASES = {
 	less: 'css',
 };
 
-function joinSections(sections) {
+export function joinSections(sections) {
 	return `${sections
 		.map((section) => section.replace(/\n+$/u, ''))
 		.join('\n\n')}\n`;
@@ -109,6 +112,14 @@ function pickSection(name, builtin, overrides) {
 		return overrides.rawSections.get(name);
 	}
 	return builtin;
+}
+
+export function templateSectionText(language, overrides = EMPTY_OVERRIDES) {
+	const templates = resolvePreset(overrides.preset ?? DEFAULT_PRESET);
+	if (language === 'base') {
+		return pickSection('base', templates.base, overrides);
+	}
+	return pickSection(language, templates.languages[language], overrides);
 }
 
 export function composeEditorConfig(languageNames = [], overrides = EMPTY_OVERRIDES) {
