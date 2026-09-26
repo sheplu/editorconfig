@@ -104,9 +104,14 @@ jobs:
 
       - name: Version
         if: github.event_name == 'release' && github.event.action == 'created'
+        env:
+          TAG: ${{ github.event.release.tag_name }}
         run: |
-          VERSION=${{ github.event.release.tag_name }}
-          VERSION=${VERSION:1}
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid release tag: $TAG (expected vMAJOR.MINOR.PATCH)"
+            exit 1
+          fi
+          VERSION="${TAG#v}"
           CURRENT_VERSION=$(npm pkg get version | tr -d '"')
           if [ "$CURRENT_VERSION" != "$VERSION" ]; then
             npm version "$VERSION" --no-git-tag-version
