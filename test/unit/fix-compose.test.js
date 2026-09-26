@@ -95,3 +95,30 @@ describe('formatDiff — dropped comments disclosure', () => {
 		assert.match(output, /- # team policy \(comment will be removed\)/u);
 	});
 });
+
+describe('composeFixedContent — stray preamble pairs', () => {
+	it('removes non-root preamble pairs from the output', () => {
+		const text = `root = true\ncharset = utf-8\n\n[*]\n${BUILTIN_BASE_BODY}`;
+		const fixed = compose(text);
+		assert.match(fixed, /^root = true\n\n\[\*\]\n/u, 'the preamble must contain only root = true');
+		const preamble = fixed.slice(0, fixed.indexOf('[*]'));
+		assert.doesNotMatch(preamble, /charset/u, 'no stray pair may remain in the preamble');
+	});
+});
+
+describe('composeFixedContent — duplicate headers', () => {
+	it('consolidates identical duplicate sections into one canonical section', () => {
+		const text = `root = true\n\n[*]\n${BUILTIN_BASE_BODY}\n${PYTHON_SECTION}\n${PYTHON_SECTION}`;
+		const fixed = compose(text, ['python']);
+		assert.equal(fixed.match(/^\[\*\.py\]$/gmu).length, 1, 'exactly one [*.py] section');
+	});
+
+	it('regenerates a duplicated header from the template rather than picking one raw block', () => {
+		const tampered = PYTHON_SECTION.replace('[*.py]\n', '[*.py]\nbogus_key = keepme\n');
+		const text = `root = true\n\n[*]\n${BUILTIN_BASE_BODY}\n${tampered}\n${PYTHON_SECTION}`;
+		const fixed = compose(text, ['python']);
+		assert.equal(fixed.match(/^\[\*\.py\]$/gmu).length, 1);
+		assert.doesNotMatch(fixed, /bogus_key/u);
+		assert.match(fixed, /max_line_length = 88/u, 'the canonical python body must be emitted');
+	});
+});

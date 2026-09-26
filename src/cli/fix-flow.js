@@ -40,6 +40,7 @@ const STATUS_LABELS = {
 	mismatch: 'mismatch',
 	missing: 'missing (will be added)',
 	invalid: 'invalid (will be removed)',
+	stray: 'stray pairs outside any section (will be removed)',
 	unknown: 'unknown (will be removed)',
 };
 
@@ -47,6 +48,7 @@ const STATUS_GLYPHS = {
 	mismatch: '❌',
 	missing: '➕',
 	invalid: '❌',
+	stray: '⚠️ ',
 	unknown: '⚠️ ',
 };
 
@@ -57,6 +59,9 @@ function flagNoteLines(diff) {
 	}
 	if (diff.outOfOrder) {
 		notes.push('    ~ section order will be normalized ([*] first)');
+	}
+	if (diff.duplicate) {
+		notes.push('    ~ duplicate header (will be consolidated into one canonical section)');
 	}
 	return notes;
 }
@@ -132,8 +137,9 @@ function buildFixDiffs(path, parsedLanguages, overrides) {
 	const parsed = parseSections(text);
 	const targetLanguages = resolveTargetLanguages(parsed, parsedLanguages);
 	const diffs = buildSectionDiffs(parsed, targetLanguages, overrides);
-	annotateDroppedComments(diffs, extractRawSections(text));
-	return { text, parsed, targetLanguages, diffs };
+	const rawBlocks = extractRawSections(text);
+	annotateDroppedComments(diffs, rawBlocks);
+	return { text, parsed, targetLanguages, diffs, rawBlocks };
 }
 
 function preservedPreambleBlock(preambleLines) {
@@ -150,8 +156,7 @@ function sectionBlock({ header, language, diffsByHeader, rawBlocks, overrides })
 	return fromFirstHeader(templateSectionText(language, overrides));
 }
 
-export function composeFixedContent({ text, parsed, diffs, targetLanguages, overrides }) {
-	const rawBlocks = extractRawSections(text);
+export function composeFixedContent({ text, parsed, diffs, targetLanguages, overrides, rawBlocks = extractRawSections(text) }) {
 	const diffsByHeader = new Map(diffs.map((diff) => [diff.header, diff]));
 	const targets = new Set(targetLanguages);
 	const ordered = AVAILABLE_LANGUAGES.filter((name) => targets.has(name));
@@ -176,6 +181,7 @@ function writeFixed(path, fix, overrides) {
 		diffs: fix.diffs,
 		targetLanguages: fix.targetLanguages,
 		overrides,
+		rawBlocks: fix.rawBlocks,
 	}));
 }
 

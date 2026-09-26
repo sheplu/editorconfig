@@ -184,3 +184,16 @@ describe('fix mode interactive — EOF at the confirmation prompt', () => {
 		assert.equal(readFileSync(state.target, 'utf8'), TAMPERED_CONTENT);
 	});
 });
+
+describe('fix mode interactive — Ctrl-C at the confirmation prompt', () => {
+	it('cancels with exit 1 and leaves the file untouched', async () => {
+		writeFileSync(state.target, TAMPERED_CONTENT, 'utf8');
+		const { exitCode, output } = await runInteractive(
+			['--mode=fix', `--path=${state.target}`],
+			'\u0003',
+		);
+		assert.equal(exitCode, 1, `expected a clean cancellation, got exit ${exitCode}:\n${output}`);
+		assert.match(output, /Cancelled/u);
+		assert.equal(readFileSync(state.target, 'utf8'), TAMPERED_CONTENT);
+	});
+});

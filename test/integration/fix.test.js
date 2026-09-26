@@ -101,6 +101,31 @@ describe('fix mode — comment handling', () => {
 	});
 });
 
+describe('fix mode — stray preamble pairs', () => {
+	it('discloses and removes key=value pairs that sit outside any section', () => {
+		const content = BUILTIN_BASE_FILE.replace('root = true\n', 'root = true\ncharset = utf-8\n');
+		writeFileSync(state.target, content, 'utf8');
+		const result = runCli(['--mode=fix', `--path=${state.target}`, '--overwrite']);
+		assert.equal(result.status, 0, result.stderr);
+		assert.match(result.stdout, /stray pairs outside any section \(will be removed\)/u);
+		assert.match(result.stdout, /- charset = utf-8/u);
+		const fixed = readFileSync(state.target, 'utf8');
+		assert.match(fixed, /^root = true\n\n\[\*\]\n/u, 'the preamble must contain only root = true');
+	});
+});
+
+describe('fix mode — duplicate sections', () => {
+	it('consolidates identical duplicate sections and discloses it', () => {
+		const content = `${BUILTIN_BASE_FILE}\n[*.py]\nindent_style = space\nindent_size = 4\nmax_line_length = 88\n\n[*.py]\nindent_style = space\nindent_size = 4\nmax_line_length = 88\n`;
+		writeFileSync(state.target, content, 'utf8');
+		const result = runCli(['--mode=fix', `--path=${state.target}`, '--overwrite']);
+		assert.equal(result.status, 0, result.stderr);
+		assert.match(result.stdout, /duplicate header \(will be consolidated/u);
+		const fixed = readFileSync(state.target, 'utf8');
+		assert.equal(fixed.match(/^\[\*\.py\]$/gmu).length, 1, 'exactly one [*.py] must remain');
+	});
+});
+
 describe('fix mode — non-TTY without --overwrite', () => {
 	it('exits non-zero when differences exist and no --overwrite', () => {
 		const tampered = BUILTIN_BASE_FILE.replace('indent_size = 4', 'indent_size = 2');

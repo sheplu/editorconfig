@@ -6,6 +6,7 @@ import {
 	expectedBodyForLanguage,
 	headerToLanguage,
 	languageToHeader,
+	parseSection,
 	resolveLanguageNames,
 } from '../templates/index.js';
 import { NOT_PROVIDED } from './options.js';
@@ -108,10 +109,10 @@ function appendMissingSections(diffs, parsed, targetLanguages) {
 	}
 }
 
-function markRootMissing(diffs) {
-	// The base diff always exists: the section was parsed, or appendMissingSections added a missing entry.
+// The base diff always exists: the section was parsed, or appendMissingSections added a missing entry.
+function flagBaseDiff(diffs, flag) {
 	const baseDiff = diffs.find((diff) => diff.header === BASE_SECTION_HEADER);
-	baseDiff.rootMissing = true;
+	baseDiff[flag] = true;
 	if (baseDiff.status === 'match') {
 		baseDiff.status = 'mismatch';
 		baseDiff.keys = { removed: [], added: [], changed: [] };
@@ -126,15 +127,40 @@ function appendInvalidLines(diffs, parsed) {
 	diffs.push({ header: 'invalid lines', status: 'invalid', lines: diagnostics });
 }
 
-function markOutOfOrder(diffs, parsed) {
-	if (!baseSectionOutOfOrder(parsed.sections)) {
+function strayPreamblePairs(parsed) {
+	const pairs = parseSection((parsed.preamble ?? []).join('\n'));
+	pairs.delete('root');
+	return [...pairs].map(([key, value]) => ({ key, value }));
+}
+
+function appendStrayPreamble(diffs, parsed) {
+	const removed = strayPreamblePairs(parsed);
+	if (removed.length === 0) {
 		return;
 	}
-	const baseDiff = diffs.find((diff) => diff.header === BASE_SECTION_HEADER);
-	baseDiff.outOfOrder = true;
-	if (baseDiff.status === 'match') {
-		baseDiff.status = 'mismatch';
-		baseDiff.keys = { removed: [], added: [], changed: [] };
+	diffs.push({ header: 'preamble', status: 'stray', keys: { removed, added: [], changed: [] } });
+}
+
+function markDuplicate(diff) {
+	diff.duplicate = true;
+	diff.bodyMatches = false;
+	if (diff.status === 'match') {
+		diff.status = 'mismatch';
+		diff.keys = { removed: [], added: [], changed: [] };
+	}
+}
+
+// A duplicated header must be consolidated: preserving one raw block verbatim silently picks a winner.
+// Every occurrence is regenerated into the single canonical section instead.
+function markDuplicates(diffs) {
+	const counts = new Map();
+	for (const diff of diffs) {
+		counts.set(diff.header, (counts.get(diff.header) ?? 0) + 1);
+	}
+	for (const diff of diffs) {
+		if (counts.get(diff.header) > 1 && diff.status !== 'unknown') {
+			markDuplicate(diff);
+		}
 	}
 }
 
@@ -142,9 +168,13 @@ export function buildSectionDiffs(parsed, targetLanguages, overrides) {
 	const diffs = parsed.sections.map((section) => buildSectionDiff(section, overrides));
 	appendMissingSections(diffs, parsed, targetLanguages);
 	appendInvalidLines(diffs, parsed);
-	markOutOfOrder(diffs, parsed);
+	appendStrayPreamble(diffs, parsed);
+	markDuplicates(diffs);
+	if (baseSectionOutOfOrder(parsed.sections)) {
+		flagBaseDiff(diffs, 'outOfOrder');
+	}
 	if (!parsed.hasRoot) {
-		markRootMissing(diffs);
+		flagBaseDiff(diffs, 'rootMissing');
 	}
 	return diffs;
 }

@@ -223,6 +223,9 @@ describe('smoke: symlinked bin invocation', { skip: process.platform === 'win32'
 		assert.ok(result.stdout.trim().length > 0);
 	});
 
+	// Note: --preserve-symlinks-main cannot be smoke-tested from a tmp dir because relative imports resolve against the link's directory.
+	// The realpath-both-sides guard is covered by test/unit/cli-entry.test.js instead.
+
 	it('check on a missing file via a bin-style symlink exits non-zero', () => {
 		const result = runViaSymlink(['--mode=check', `--path=${state.target}`]);
 		assert.notEqual(result.status, 0);
