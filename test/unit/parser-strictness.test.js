@@ -1,6 +1,25 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseSection, parseSections } from '../../src/templates/index.js';
+import { baseSectionOutOfOrder, parseSection, parseSections } from '../../src/templates/index.js';
+
+describe('baseSectionOutOfOrder', () => {
+	it('flags a known language section that precedes [*]', () => {
+		const { sections } = parseSections('root = true\n\n[*.md]\nindent_size = 2\n\n[*]\nindent_style = tab\n');
+		assert.equal(baseSectionOutOfOrder(sections), true);
+	});
+	it('accepts the canonical order ([*] first)', () => {
+		const { sections } = parseSections('root = true\n\n[*]\nindent_style = tab\n\n[*.md]\nindent_size = 2\n');
+		assert.equal(baseSectionOutOfOrder(sections), false);
+	});
+	it('ignores unknown sections that precede [*]', () => {
+		const { sections } = parseSections('root = true\n\n[Cargo.toml]\nfoo = bar\n\n[*]\nindent_style = tab\n');
+		assert.equal(baseSectionOutOfOrder(sections), false);
+	});
+	it('returns false when there is no [*] section', () => {
+		const { sections } = parseSections('root = true\n\n[*.md]\nindent_size = 2\n');
+		assert.equal(baseSectionOutOfOrder(sections), false);
+	});
+});
 
 describe('parseSection — value normalization', () => {
 	it('lowercases values of the standard case-insensitive keys', () => {

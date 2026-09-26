@@ -145,6 +145,17 @@ export function headerToLanguage(header) {
 	return HEADER_TO_LANGUAGE.get(header);
 }
 
+// Later matching sections take precedence (spec: file processing), so
+// [*] must be declared before any language section in a canonical file.
+export function baseSectionOutOfOrder(sections) {
+	const baseAt = sections.findIndex((section) => section.header === BASE_HEADER);
+	if (baseAt === -1) {
+		return false;
+	}
+	const firstKnownAt = sections.findIndex((section) => HEADER_TO_LANGUAGE.has(section.header));
+	return firstKnownAt !== -1 && firstKnownAt < baseAt;
+}
+
 export function expectedBodyForLanguage(language, overrides = EMPTY_OVERRIDES) {
 	if (overrides.bodies.has(language)) {
 		return overrides.bodies.get(language);

@@ -3,6 +3,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import {
 	AVAILABLE_LANGUAGES,
 	BASE_SECTION_HEADER,
+	baseSectionOutOfOrder,
 	compareSection,
 	composeEditorConfig,
 	expectedBodyForLanguage,
@@ -92,11 +93,11 @@ function buildSectionDiff(section, overrides) {
 	const { ok } = compareSection(section.body, expected);
 
 	if (ok) {
-		return { header: section.header, status: 'match' };
+		return { header: section.header, status: 'match', bodyMatches: true };
 	}
 
 	const keys = diffKeys(section.body, expected);
-	return { header: section.header, status: 'mismatch', keys };
+	return { header: section.header, status: 'mismatch', bodyMatches: false, keys };
 }
 
 function appendMissingSections(diffs, parsed, targetLanguages) {
@@ -129,10 +130,23 @@ function appendInvalidLines(diffs, parsed) {
 	diffs.push({ header: 'invalid lines', status: 'invalid', lines: diagnostics });
 }
 
+function markOutOfOrder(diffs, parsed) {
+	if (!baseSectionOutOfOrder(parsed.sections)) {
+		return;
+	}
+	const baseDiff = diffs.find((diff) => diff.header === BASE_SECTION_HEADER);
+	baseDiff.outOfOrder = true;
+	if (baseDiff.status === 'match') {
+		baseDiff.status = 'mismatch';
+		baseDiff.keys = { removed: [], added: [], changed: [] };
+	}
+}
+
 export function buildSectionDiffs(parsed, targetLanguages, overrides) {
 	const diffs = parsed.sections.map((section) => buildSectionDiff(section, overrides));
 	appendMissingSections(diffs, parsed, targetLanguages);
 	appendInvalidLines(diffs, parsed);
+	markOutOfOrder(diffs, parsed);
 	if (!parsed.hasRoot) {
 		markRootMissing(diffs);
 	}
@@ -172,23 +186,28 @@ const STATUS_GLYPHS = {
 	unknown: '⚠️ ',
 };
 
+function sectionNoteLines(diff) {
+	const notes = [];
+	if (diff.rootMissing) {
+		notes.push("    + root = true (missing preamble)");
+	}
+	if (diff.outOfOrder) {
+		notes.push('    ~ section order will be normalized ([*] first)');
+	}
+	if (diff.lines) {
+		notes.push(...formatInvalidLines(diff.lines));
+	}
+	if (diff.keys) {
+		notes.push(...formatKeyDiff(diff.keys));
+	}
+	return notes;
+}
+
 function appendSectionLines(diff, lines) {
 	const glyph = STATUS_GLYPHS[diff.status];
 	const label = STATUS_LABELS[diff.status];
 	lines.push(`  ${glyph} ${diff.header} — ${label}`);
-
-	if (diff.rootMissing) {
-		lines.push("    + root = true (missing preamble)");
-	}
-
-	if (diff.lines) {
-		lines.push(...formatInvalidLines(diff.lines));
-	}
-
-	if (diff.keys) {
-		lines.push(...formatKeyDiff(diff.keys));
-	}
-
+	lines.push(...sectionNoteLines(diff));
 	lines.push('');
 }
 

@@ -76,6 +76,18 @@ describe('check --json', () => {
 	});
 });
 
+describe('check --json — missing base with a language filter', () => {
+	it('reports a missing [*] exactly once', () => {
+		writeFileSync(state.target, '', 'utf8');
+		const checked = runCli(['--mode=check', `--path=${state.target}`, '--languages=js', '--json']);
+		assert.notEqual(checked.status, 0);
+		const payload = JSON.parse(checked.stdout);
+		const baseEntries = payload.sections.filter((section) => section.header === '[*]');
+		assert.equal(baseEntries.length, 1, 'missing [*] must not be double-counted');
+		assert.equal(payload.summary.failed, 2, 'one missing base + one missing js section');
+	});
+});
+
 describe('check --recursive --json', () => {
 	function writeFile(relPath, contents) {
 		const full = join(state.workdir, relPath);
