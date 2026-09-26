@@ -1,161 +1,25 @@
 import { createInterface } from 'node:readline';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import {
 	AVAILABLE_LANGUAGES,
 	BASE_SECTION_HEADER,
-	baseSectionOutOfOrder,
-	compareSection,
-	composeEditorConfig,
-	expectedBodyForLanguage,
-	headerToLanguage,
+	extractRawSections,
+	fromFirstHeader,
+	joinSections,
 	languageToHeader,
 	parseSections,
-	resolveLanguageNames,
+	stripInvalidLines,
+	templateSectionText,
 } from '../templates/index.js';
 import { logger } from '../utils/logger.js';
-import { NOT_PROVIDED } from './options.js';
+import { writeFileAtomic } from '../utils/atomic-write.js';
+import {
+	buildSectionDiffs,
+	hasChanges,
+	resolveTargetLanguages,
+} from './fix-diffs.js';
 
-export function detectLanguages(parsed) {
-	const languages = [];
-	for (const section of parsed.sections) {
-		if (section.header !== BASE_SECTION_HEADER) {
-			const language = headerToLanguage(section.header);
-			if (language) {
-				languages.push(language);
-			}
-		}
-	}
-	return languages;
-}
-
-function mergeLanguages(detected, parsedLanguages) {
-	if (parsedLanguages === NOT_PROVIDED) {
-		return detected;
-	}
-	const resolved = resolveLanguageNames(parsedLanguages);
-	const merged = new Set(detected);
-	for (const name of resolved) {
-		merged.add(name);
-	}
-	return AVAILABLE_LANGUAGES.filter((name) => merged.has(name));
-}
-
-function resolveTargetLanguages(parsed, parsedLanguages) {
-	const detected = detectLanguages(parsed);
-	return mergeLanguages(detected, parsedLanguages);
-}
-
-function collectAddedChanged(actualBody, expectedBody) {
-	const added = [];
-	const changed = [];
-	for (const [key, value] of expectedBody) {
-		if (!actualBody.has(key)) {
-			added.push({ key, value });
-		}
-		else if (actualBody.get(key) !== value) {
-			changed.push({ key, from: actualBody.get(key), to: value });
-		}
-	}
-	return { added, changed };
-}
-
-function collectRemoved(actualBody, expectedBody) {
-	const removed = [];
-	for (const [key, value] of actualBody) {
-		if (!expectedBody.has(key)) {
-			removed.push({ key, value });
-		}
-	}
-	return removed;
-}
-
-function diffKeys(actualBody, expectedBody) {
-	const removed = collectRemoved(actualBody, expectedBody);
-	const { added, changed } = collectAddedChanged(actualBody, expectedBody);
-	return { removed, added, changed };
-}
-
-function resolveSectionLanguage(section) {
-	if (section.header === BASE_SECTION_HEADER) {
-		return 'base';
-	}
-	return headerToLanguage(section.header);
-}
-
-function buildSectionDiff(section, overrides) {
-	const language = resolveSectionLanguage(section);
-
-	if (!language) {
-		return { header: section.header, status: 'unknown' };
-	}
-
-	const expected = expectedBodyForLanguage(language, overrides);
-	const { ok } = compareSection(section.body, expected);
-
-	if (ok) {
-		return { header: section.header, status: 'match', bodyMatches: true };
-	}
-
-	const keys = diffKeys(section.body, expected);
-	return { header: section.header, status: 'mismatch', bodyMatches: false, keys };
-}
-
-function appendMissingSections(diffs, parsed, targetLanguages) {
-	const presentHeaders = new Set(parsed.sections.map((section) => section.header));
-	const expectedHeaders = [
-		BASE_SECTION_HEADER,
-		...targetLanguages.map((name) => languageToHeader(name)),
-	];
-	for (const header of expectedHeaders) {
-		if (!presentHeaders.has(header)) {
-			diffs.push({ header, status: 'missing' });
-		}
-	}
-}
-
-function markRootMissing(diffs) {
-	const baseDiff = diffs.find((diff) => diff.header === BASE_SECTION_HEADER);
-	if (baseDiff && baseDiff.status === 'match') {
-		baseDiff.status = 'mismatch';
-		baseDiff.keys = { removed: [], added: [], changed: [] };
-		baseDiff.rootMissing = true;
-	}
-}
-
-function appendInvalidLines(diffs, parsed) {
-	const diagnostics = parsed.diagnostics ?? [];
-	if (diagnostics.length === 0) {
-		return;
-	}
-	diffs.push({ header: 'invalid lines', status: 'invalid', lines: diagnostics });
-}
-
-function markOutOfOrder(diffs, parsed) {
-	if (!baseSectionOutOfOrder(parsed.sections)) {
-		return;
-	}
-	const baseDiff = diffs.find((diff) => diff.header === BASE_SECTION_HEADER);
-	baseDiff.outOfOrder = true;
-	if (baseDiff.status === 'match') {
-		baseDiff.status = 'mismatch';
-		baseDiff.keys = { removed: [], added: [], changed: [] };
-	}
-}
-
-export function buildSectionDiffs(parsed, targetLanguages, overrides) {
-	const diffs = parsed.sections.map((section) => buildSectionDiff(section, overrides));
-	appendMissingSections(diffs, parsed, targetLanguages);
-	appendInvalidLines(diffs, parsed);
-	markOutOfOrder(diffs, parsed);
-	if (!parsed.hasRoot) {
-		markRootMissing(diffs);
-	}
-	return diffs;
-}
-
-export function hasChanges(diffs) {
-	return diffs.some((diff) => diff.status !== 'match');
-}
+export { buildSectionDiffs, detectLanguages, hasChanges } from './fix-diffs.js';
 
 function formatKeyDiff(keys) {
 	const lines = [];
@@ -186,7 +50,7 @@ const STATUS_GLYPHS = {
 	unknown: '⚠️ ',
 };
 
-function sectionNoteLines(diff) {
+function flagNoteLines(diff) {
 	const notes = [];
 	if (diff.rootMissing) {
 		notes.push("    + root = true (missing preamble)");
@@ -194,13 +58,25 @@ function sectionNoteLines(diff) {
 	if (diff.outOfOrder) {
 		notes.push('    ~ section order will be normalized ([*] first)');
 	}
+	return notes;
+}
+
+function sectionNoteLines(diff) {
+	const notes = flagNoteLines(diff);
 	if (diff.lines) {
 		notes.push(...formatInvalidLines(diff.lines));
 	}
 	if (diff.keys) {
 		notes.push(...formatKeyDiff(diff.keys));
 	}
+	if (diff.droppedComments) {
+		notes.push(...formatDroppedComments(diff.droppedComments));
+	}
 	return notes;
+}
+
+function formatDroppedComments(comments) {
+	return comments.map((comment) => `    - ${comment.trim()} (comment will be removed)`);
 }
 
 function appendSectionLines(diff, lines) {
@@ -237,16 +113,76 @@ function confirmFix() {
 	});
 }
 
+function isCommentLine(line) {
+	const trimmed = line.trim();
+	return trimmed.startsWith('#') || trimmed.startsWith(';');
+}
+
+function commentLines(block) {
+	return block.split('\n').filter((line) => isCommentLine(line));
+}
+
+function annotateDroppedComments(diffs, rawBlocks) {
+	for (const diff of diffs) {
+		if (diff.bodyMatches === false && rawBlocks.has(diff.header)) {
+			const dropped = commentLines(rawBlocks.get(diff.header));
+			if (dropped.length > 0) {
+				diff.droppedComments = dropped;
+			}
+		}
+	}
+}
+
 function buildFixDiffs(path, parsedLanguages, overrides) {
 	const text = readFileSync(path, 'utf8');
 	const parsed = parseSections(text);
 	const targetLanguages = resolveTargetLanguages(parsed, parsedLanguages);
 	const diffs = buildSectionDiffs(parsed, targetLanguages, overrides);
-	return { targetLanguages, diffs };
+	annotateDroppedComments(diffs, extractRawSections(text));
+	return { text, parsed, targetLanguages, diffs };
 }
 
-function writeFixed(path, targetLanguages, overrides) {
-	writeFileSync(path, composeEditorConfig(targetLanguages, overrides), 'utf8');
+function preservedPreambleBlock(preambleLines) {
+	const comments = preambleLines.filter((line) => isCommentLine(line));
+	return [...comments, 'root = true'].join('\n');
+}
+
+function sectionBlock({ header, language, diffsByHeader, rawBlocks, overrides }) {
+	const diff = diffsByHeader.get(header);
+	if (diff && diff.bodyMatches && rawBlocks.has(header)) {
+		// The body already matches: keep the user's raw section (with its comments), dropping only invalid lines.
+		return stripInvalidLines(rawBlocks.get(header));
+	}
+	return fromFirstHeader(templateSectionText(language, overrides));
+}
+
+export function composeFixedContent({ text, parsed, diffs, targetLanguages, overrides }) {
+	const rawBlocks = extractRawSections(text);
+	const diffsByHeader = new Map(diffs.map((diff) => [diff.header, diff]));
+	const targets = new Set(targetLanguages);
+	const ordered = AVAILABLE_LANGUAGES.filter((name) => targets.has(name));
+	const blocks = [
+		preservedPreambleBlock(parsed.preamble),
+		sectionBlock({ header: BASE_SECTION_HEADER, language: 'base', diffsByHeader, rawBlocks, overrides }),
+		...ordered.map((name) => sectionBlock({
+			header: languageToHeader(name),
+			language: name,
+			diffsByHeader,
+			rawBlocks,
+			overrides,
+		})),
+	];
+	return joinSections(blocks);
+}
+
+function writeFixed(path, fix, overrides) {
+	writeFileAtomic(path, composeFixedContent({
+		text: fix.text,
+		parsed: fix.parsed,
+		diffs: fix.diffs,
+		targetLanguages: fix.targetLanguages,
+		overrides,
+	}));
 }
 
 function requireConfirmation() {
@@ -258,17 +194,34 @@ function requireConfirmation() {
 	return false;
 }
 
-async function confirmAndWrite(path, targetLanguages, overrides) {
+function fileChangedSince(path, text) {
+	try {
+		return readFileSync(path, 'utf8') !== text;
+	}
+	catch {
+		return true;
+	}
+}
+
+function writeConfirmed(path, fix, overrides) {
+	if (fileChangedSince(path, fix.text)) {
+		logger.error(`'${path}' changed while waiting for confirmation; no changes were applied. Re-run fix.`);
+		process.exitCode = 1;
+		return;
+	}
+	writeFixed(path, fix, overrides);
+}
+
+async function confirmAndWrite(path, fix, overrides) {
 	if (!requireConfirmation()) {
 		return;
 	}
 	const confirmed = await confirmFix();
-	if (confirmed) {
-		writeFixed(path, targetLanguages, overrides);
-	}
-	else {
+	if (!confirmed) {
 		logger.log(`Skipped: \`${path}\` was not modified.`);
+		return;
 	}
+	writeConfirmed(path, fix, overrides);
 }
 
 function reportDiffs(diffs, path) {
@@ -285,16 +238,16 @@ export async function runFix({ path, overwrite, parsedLanguages, overrides }) {
 		throw new Error(`'${path}' does not exist. Use --mode=write to create it.`);
 	}
 
-	const { targetLanguages, diffs } = buildFixDiffs(path, parsedLanguages, overrides);
+	const fix = buildFixDiffs(path, parsedLanguages, overrides);
 
-	if (!reportDiffs(diffs, path)) {
+	if (!reportDiffs(fix.diffs, path)) {
 		return;
 	}
 
 	if (overwrite) {
-		writeFixed(path, targetLanguages, overrides);
+		writeFixed(path, fix, overrides);
 		return;
 	}
 
-	await confirmAndWrite(path, targetLanguages, overrides);
+	await confirmAndWrite(path, fix, overrides);
 }

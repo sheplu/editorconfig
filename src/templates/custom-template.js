@@ -1,14 +1,12 @@
 import {
 	AVAILABLE_LANGUAGES,
 	BASE_SECTION_HEADER,
+	extractRawSections,
 	headerToLanguage,
 	languageToHeader,
 	parseSections,
 } from './index.js';
 import { readTemplateText } from './template-source.js';
-
-const HEADER_LINE = /^\[.*\]$/u;
-const NO_HEADER = '';
 
 function knownHeaders() {
 	return [BASE_SECTION_HEADER, ...AVAILABLE_LANGUAGES.map((name) => languageToHeader(name))];
@@ -19,44 +17,6 @@ function languageForHeader(header) {
 		return 'base';
 	}
 	return headerToLanguage(header);
-}
-
-function trimTrailingBlankLines(lines) {
-	while (lines.length > 0 && lines.at(-1).trim() === '') {
-		lines.pop();
-	}
-}
-
-function flushBlock(state, blocks) {
-	if (state.header === NO_HEADER) {
-		return;
-	}
-	trimTrailingBlankLines(state.lines);
-	blocks.set(state.header, [state.header, ...state.lines].join('\n'));
-}
-
-function processLine(state, blocks, line) {
-	const trimmed = line.trim();
-	if (HEADER_LINE.test(trimmed)) {
-		flushBlock(state, blocks);
-		state.header = trimmed;
-		state.lines = [];
-		return;
-	}
-	if (state.header !== NO_HEADER) {
-		state.lines.push(line);
-	}
-}
-
-function extractRawSections(text) {
-	const normalized = text.replaceAll(/\r\n?/gu, '\n');
-	const blocks = new Map();
-	const state = { header: NO_HEADER, lines: [] };
-	for (const line of normalized.split('\n')) {
-		processLine(state, blocks, line);
-	}
-	flushBlock(state, blocks);
-	return blocks;
 }
 
 function rejectUnknownHeader(path, header) {

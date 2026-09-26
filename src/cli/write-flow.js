@@ -1,4 +1,4 @@
-import { existsSync, writeFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 import {
 	AVAILABLE_LANGUAGES,
@@ -6,10 +6,11 @@ import {
 	EMPTY_OVERRIDES,
 } from '../templates/index.js';
 import { logger } from '../utils/logger.js';
+import { writeFileAtomic } from '../utils/atomic-write.js';
 import { NOT_PROVIDED } from './options.js';
 
 export function createEditorConfig(path = '.editorconfig', languages = [], overrides = EMPTY_OVERRIDES) {
-	writeFileSync(path, composeEditorConfig(languages, overrides), 'utf8');
+	writeFileAtomic(path, composeEditorConfig(languages, overrides));
 };
 
 function resolvePromptAnswer(answer) {

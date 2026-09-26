@@ -22,7 +22,7 @@ afterEach(() => {
 	rmSync(state.workdir, { recursive: true, force: true });
 });
 
-function runInteractive(args, reply) {
+function runInteractive(args, reply, beforeReply) {
 	return new Promise((resolve, reject) => {
 		const proc = spawn(process.execPath, [cliEntry, ...args], {
 			name: 'xterm-256color',
@@ -43,6 +43,9 @@ function runInteractive(args, reply) {
 			output += chunk;
 			if (!replied && /Apply these changes\?/u.test(output)) {
 				replied = true;
+				if (beforeReply) {
+					beforeReply();
+				}
 				proc.write(reply);
 			}
 		});
@@ -118,6 +121,21 @@ describe('fix mode interactive — declines fix', () => {
 		);
 		assert.equal(exitCode, 0);
 		assert.equal(readFileSync(state.target, 'utf8'), TAMPERED_CONTENT);
+	});
+});
+
+describe('fix mode interactive — concurrent modification', () => {
+	it('aborts when the file changed while the confirmation prompt was pending', async () => {
+		writeFileSync(state.target, TAMPERED_CONTENT, 'utf8');
+		const midEdit = `${TAMPERED_CONTENT}\n[*.py]\nindent_style = space\nindent_size = 4\nmax_line_length = 88\n`;
+		const { exitCode, output } = await runInteractive(
+			['--mode=fix', `--path=${state.target}`],
+			'y\r',
+			() => writeFileSync(state.target, midEdit, 'utf8'),
+		);
+		assert.equal(exitCode, 1);
+		assert.match(output, /changed while waiting for confirmation/u);
+		assert.equal(readFileSync(state.target, 'utf8'), midEdit, 'the concurrent edit must survive');
 	});
 });
 
