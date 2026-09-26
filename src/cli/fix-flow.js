@@ -1,4 +1,3 @@
-import { createInterface } from 'node:readline';
 import { existsSync, readFileSync } from 'node:fs';
 import {
 	AVAILABLE_LANGUAGES,
@@ -13,6 +12,7 @@ import {
 } from '../templates/index.js';
 import { logger } from '../utils/logger.js';
 import { writeFileAtomic } from '../utils/atomic-write.js';
+import { ask, CANCELLED, isYes } from './prompt.js';
 import {
 	buildSectionDiffs,
 	hasChanges,
@@ -104,13 +104,7 @@ export function formatDiff(diffs, displayPath) {
 }
 
 function confirmFix() {
-	return new Promise((resolve) => {
-		const rl = createInterface({ input: process.stdin, output: process.stdout });
-		rl.question('Apply these changes? [y/N] ', (answer) => {
-			rl.close();
-			resolve(/^y(es)?$/iu.test(answer.trim()));
-		});
-	});
+	return ask('Apply these changes? [y/N] ');
 }
 
 function isCommentLine(line) {
@@ -212,16 +206,25 @@ function writeConfirmed(path, fix, overrides) {
 	writeFixed(path, fix, overrides);
 }
 
-async function confirmAndWrite(path, fix, overrides) {
-	if (!requireConfirmation()) {
+function applyFixAnswer({ answer, path, fix, overrides }) {
+	if (answer === CANCELLED) {
+		logger.error(`Cancelled: \`${path}\` was not modified.`);
+		process.exitCode = 1;
 		return;
 	}
-	const confirmed = await confirmFix();
-	if (!confirmed) {
+	if (!isYes(answer)) {
 		logger.log(`Skipped: \`${path}\` was not modified.`);
 		return;
 	}
 	writeConfirmed(path, fix, overrides);
+}
+
+async function confirmAndWrite(path, fix, overrides) {
+	if (!requireConfirmation()) {
+		return;
+	}
+	const answer = await confirmFix();
+	applyFixAnswer({ answer, path, fix, overrides });
 }
 
 function reportDiffs(diffs, path) {

@@ -1,5 +1,4 @@
 import { existsSync } from 'node:fs';
-import { createInterface } from 'node:readline';
 import {
 	AVAILABLE_LANGUAGES,
 	composeEditorConfig,
@@ -8,37 +7,42 @@ import {
 import { logger } from '../utils/logger.js';
 import { writeFileAtomic } from '../utils/atomic-write.js';
 import { NOT_PROVIDED } from './options.js';
+import { ask, CANCELLED, isYes } from './prompt.js';
 
 export function createEditorConfig(path = '.editorconfig', languages = [], overrides = EMPTY_OVERRIDES) {
 	writeFileAtomic(path, composeEditorConfig(languages, overrides));
 };
 
-function resolvePromptAnswer(answer) {
-	const tokens = answer
-		.split(',')
-		.map((token) => token.trim().toLowerCase())
-		.filter((token) => token.length > 0);
-	return tokens.map((token) => {
-		const asNumber = Number.parseInt(token, 10);
-		if (Number.isInteger(asNumber) && asNumber >= 1 && asNumber <= AVAILABLE_LANGUAGES.length) {
-			return AVAILABLE_LANGUAGES[asNumber - 1];
-		}
+function resolveToken(token) {
+	// Only a full-integer token is an index — '1garbage' or '1.5' must not silently select language 1.
+	if (!/^\d+$/u.test(token)) {
 		return token;
-	});
+	}
+	const index = Number.parseInt(token, 10);
+	if (index < 1 || index > AVAILABLE_LANGUAGES.length) {
+		throw new Error(`language index out of range: '${token}' (valid: 1-${AVAILABLE_LANGUAGES.length})`);
+	}
+	return AVAILABLE_LANGUAGES[index - 1];
 }
 
-function promptLanguages() {
-	return new Promise((resolve) => {
-		const rl = createInterface({ input: process.stdin, output: process.stdout });
-		const numbered = AVAILABLE_LANGUAGES
-			.map((name, index) => `  ${index + 1}. ${name}`)
-			.join('\n');
-		logger.log(`Available language sections:\n${numbered}`);
-		rl.question('Languages? [comma-separated names or indices, blank=base only] ', (answer) => {
-			rl.close();
-			resolve(resolvePromptAnswer(answer));
-		});
-	});
+export function resolvePromptAnswer(answer) {
+	return answer
+		.split(',')
+		.map((token) => token.trim().toLowerCase())
+		.filter((token) => token.length > 0)
+		.map((token) => resolveToken(token));
+}
+
+async function promptLanguages() {
+	const numbered = AVAILABLE_LANGUAGES
+		.map((name, index) => `  ${index + 1}. ${name}`)
+		.join('\n');
+	logger.log(`Available language sections:\n${numbered}`);
+	const answer = await ask('Languages? [comma-separated names or indices, blank=base only] ');
+	if (answer === CANCELLED) {
+		return CANCELLED;
+	}
+	return resolvePromptAnswer(answer);
 }
 
 function resolveLanguages(parsedLanguages) {
@@ -51,14 +55,21 @@ function resolveLanguages(parsedLanguages) {
 	return Promise.resolve([]);
 }
 
-function confirmOverwrite(path) {
-	return new Promise((resolve) => {
-		const rl = createInterface({ input: process.stdin, output: process.stdout });
-		rl.question(`\`${path}\` already exists. Overwrite? [y/N] `, (answer) => {
-			rl.close();
-			resolve(/^y(es)?$/iu.test(answer.trim()));
-		});
-	});
+function reportCancelled(path) {
+	logger.error(`Cancelled: \`${path}\` was not modified.`);
+	process.exitCode = 1;
+}
+
+function applyOverwriteAnswer({ answer, path, languages, overrides }) {
+	if (answer === CANCELLED) {
+		reportCancelled(path);
+		return;
+	}
+	if (isYes(answer)) {
+		createEditorConfig(path, languages, overrides);
+		return;
+	}
+	logger.log(`Skipped: \`${path}\` was not modified.`);
 }
 
 async function handleExistingTarget(path, languages, overrides) {
@@ -67,17 +78,16 @@ async function handleExistingTarget(path, languages, overrides) {
 		process.exitCode = 1;
 		return;
 	}
-	const confirmed = await confirmOverwrite(path);
-	if (confirmed) {
-		createEditorConfig(path, languages, overrides);
-	}
-	else {
-		logger.log(`Skipped: \`${path}\` was not modified.`);
-	}
+	const answer = await ask(`\`${path}\` already exists. Overwrite? [y/N] `);
+	applyOverwriteAnswer({ answer, path, languages, overrides });
 }
 
 export async function runWrite({ path, overwrite, parsedLanguages, overrides }) {
 	const languages = await resolveLanguages(parsedLanguages);
+	if (languages === CANCELLED) {
+		reportCancelled(path);
+		return;
+	}
 	if (!existsSync(path) || overwrite) {
 		createEditorConfig(path, languages, overrides);
 		return;
