@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -171,4 +171,36 @@ describe('write mode language prompt — selection', () => {
 		assert.match(content, /\[\*\.\{js,jsx,ts,tsx,mjs,cjs\}\]/u);
 		assert.match(content, /\[\*\.md\]/u);
 	}));
+});
+
+describe('write mode language prompt — EOF and invalid selections', () => {
+	it('cancels with exit 1 on Ctrl-D at the language prompt', () => expectPromptOutput('\u0004', ({ exitCode, output }) => {
+		assert.equal(exitCode, 1, `expected a clean cancellation, got exit ${exitCode}:\n${output}`);
+		assert.match(output, /Cancelled/u);
+		assert.equal(existsSync(state.target), false, 'no file may be written on cancellation');
+	}));
+
+	it('rejects an out-of-range numeric selection with exit 1', () => expectPromptOutput('99\r', ({ exitCode, output }) => {
+		assert.equal(exitCode, 1);
+		assert.match(output, /language index out of range: '99'/u);
+		assert.equal(existsSync(state.target), false);
+	}));
+
+	it('rejects a numeric prefix with trailing garbage with exit 1', () => expectPromptOutput('1garbage\r', ({ exitCode, output }) => {
+		assert.equal(exitCode, 1);
+		assert.match(output, /unknown language: '1garbage'/u);
+		assert.equal(existsSync(state.target), false);
+	}));
+});
+
+describe('write mode overwrite prompt — EOF', () => {
+	it('cancels with exit 1 and leaves the file untouched on Ctrl-D', () => {
+		writeFileSync(state.target, PREVIOUS, 'utf8');
+		return runInteractive(['--mode=write', `--path=${state.target}`, '--languages='], '\u0004')
+			.then(({ exitCode, output }) => {
+				assert.equal(exitCode, 1, `expected a clean cancellation, got exit ${exitCode}:\n${output}`);
+				assert.match(output, /Cancelled/u);
+				assert.equal(readFileSync(state.target, 'utf8'), PREVIOUS);
+			});
+	});
 });
