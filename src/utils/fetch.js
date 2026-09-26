@@ -54,12 +54,33 @@ export async function consumeStream(reader, url) {
 	}
 }
 
+export function discardBody(response) {
+	if (!response.body) {
+		return;
+	}
+	// Swallow any cancel() rejection — the response is already being discarded.
+	response.body.cancel().catch(() => {
+		// A rejected cancel() carries no information the caller can act on.
+	});
+}
+
 export async function readBoundedBody(response, url) {
-	checkContentLength(response, url);
+	if (!response.body) {
+		throw new Error(`failed to fetch '${url}': response has no body`);
+	}
+	try {
+		checkContentLength(response, url);
+	}
+	catch (error) {
+		discardBody(response);
+		throw error;
+	}
 	return await consumeStream(response.body.getReader(), url);
 }
 
 export function resolveRedirect(response, currentUrl) {
+	// The redirect body is never read; cancel it so the socket is released.
+	discardBody(response);
 	const location = response.headers.get('location');
 	return parseRedirectLocation(location, currentUrl);
 }
@@ -73,6 +94,7 @@ export async function performFetch(initialUrl, signal) {
 			return readBoundedBody(response, url);
 		}
 		if (!isRedirect(response.status)) {
+			discardBody(response);
 			throw new Error(`failed to fetch '${url}': HTTP ${response.status}`);
 		}
 		url = resolveRedirect(response, url);
@@ -101,5 +123,7 @@ export async function fetchTemplate(url) {
 	}
 	finally {
 		clearTimeout(timer);
+		// Abort after settling: idempotent, and it tears down any response body an error path left open.
+		controller.abort();
 	}
 }

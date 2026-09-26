@@ -5,12 +5,13 @@ import {
 	checkContentLength,
 	consumeStream,
 	decodeChunks,
+	discardBody,
 	isRedirect,
 	readBoundedBody,
 	rejectOversized,
 	resolveRedirect,
 } from '../../src/utils/fetch.js';
-import { makeResponse, ONE_MB, streamFrom } from './fetch-helpers.js';
+import { makeBodylessResponse, makeResponse, ONE_MB, streamFrom, trackedStream } from './fetch-helpers.js';
 
 describe('isRedirect', () => {
 	it('returns false for 299 (boundary just below)', () => {
@@ -173,6 +174,42 @@ describe('readBoundedBody', () => {
 		});
 		const text = await readBoundedBody(response, 'https://example.com/x');
 		assert.equal(text, 'body');
+	});
+
+	it('rejects a bodyless response (e.g. HTTP 204) with a clear message', async () => {
+		const response = makeBodylessResponse();
+		await assert.rejects(
+			readBoundedBody(response, 'https://example.com/empty'),
+			/response has no body/u,
+		);
+	});
+
+	it('cancels the unread body when Content-Length is oversized', async () => {
+		const flags = { cancelled: false };
+		const response = makeResponse({
+			headers: { 'content-length': String(ONE_MB * 2) },
+			stream: trackedStream(flags),
+		});
+		await assert.rejects(readBoundedBody(response, 'https://example.com/big'), /exceeds 1 MB limit/u);
+		assert.equal(flags.cancelled, true, 'the oversized body must be cancelled');
+	});
+});
+
+describe('discardBody', () => {
+	it('cancels the response body', () => {
+		const flags = { cancelled: false };
+		discardBody(makeResponse({ stream: trackedStream(flags) }));
+		assert.equal(flags.cancelled, true);
+	});
+
+	it('tolerates a null body', () => {
+		assert.doesNotThrow(() => discardBody(makeBodylessResponse()));
+	});
+
+	it('swallows a rejecting cancel()', () => {
+		const response = makeResponse({});
+		response.body = { cancel: () => Promise.reject(new Error('boom')) };
+		assert.doesNotThrow(() => discardBody(response));
 	});
 });
 
