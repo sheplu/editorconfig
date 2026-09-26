@@ -5,7 +5,7 @@ import {
 	fetchTemplate,
 	performFetch,
 } from '../../src/utils/fetch.js';
-import { makeResponse, ONE_MB, streamFrom } from './fetch-helpers.js';
+import { makeResponse, ONE_MB, streamFrom, trackedStream } from './fetch-helpers.js';
 
 const state = { originalFetch: globalThis.fetch };
 
@@ -59,6 +59,47 @@ describe('performFetch', () => {
 	});
 });
 
+describe('performFetch — body cleanup', () => {
+	it('cancels the unread body of an HTTP error response', async () => {
+		const flags = { cancelled: false };
+		globalThis.fetch = () => Promise.resolve(makeResponse({ status: 404, stream: trackedStream(flags) }));
+		await assert.rejects(
+			performFetch('https://example.com/missing', new AbortController().signal),
+			/HTTP 404/u,
+		);
+		assert.equal(flags.cancelled, true, 'the 404 body must be cancelled');
+	});
+
+	it('cancels the unread body of each redirect hop', async () => {
+		const flags = { cancelled: false };
+		const calls = [];
+		globalThis.fetch = (url) => {
+			calls.push(url);
+			if (calls.length === 1) {
+				return Promise.resolve(makeResponse({
+					status: 302,
+					headers: { location: '/final' },
+					stream: trackedStream(flags),
+				}));
+			}
+			return Promise.resolve(makeResponse({ stream: streamFrom(new TextEncoder().encode('done')) }));
+		};
+		const text = await performFetch('https://example.com/start', new AbortController().signal);
+		assert.equal(text, 'done');
+		assert.equal(flags.cancelled, true, 'the redirect body must be cancelled');
+	});
+
+	it('cancels the body of a redirect without a Location header before rejecting', async () => {
+		const flags = { cancelled: false };
+		globalThis.fetch = () => Promise.resolve(makeResponse({ status: 302, stream: trackedStream(flags) }));
+		await assert.rejects(
+			performFetch('https://example.com/start', new AbortController().signal),
+			/redirect missing Location header/u,
+		);
+		assert.equal(flags.cancelled, true);
+	});
+});
+
 describe('performFetch — HTTP errors', () => {
 	it('throws on a 404', async () => {
 		globalThis.fetch = () => Promise.resolve(makeResponse({ status: 404 }));
@@ -106,6 +147,20 @@ describe('describeFetchError', () => {
 			"failed to fetch 'https://127.0.0.1:1/x': connect ECONNREFUSED 127.0.0.1:1",
 		);
 		assert.notEqual(result, inner, 'wrapped errors must be a new Error instance');
+	});
+});
+
+describe('fetchTemplate — signal teardown', () => {
+	it('aborts its signal after settling so no connection can linger', async () => {
+		const seen = { signal: false };
+		globalThis.fetch = (_url, { signal }) => {
+			seen.signal = signal;
+			return Promise.resolve(makeResponse({
+				stream: streamFrom(new TextEncoder().encode('contents')),
+			}));
+		};
+		await fetchTemplate('https://example.com/x');
+		assert.equal(seen.signal.aborted, true, 'the controller must be aborted after completion');
 	});
 });
 
