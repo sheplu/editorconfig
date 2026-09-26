@@ -20,6 +20,9 @@
 	"bin": {
 		"@sheplu/editorconfig": "index.js"
 	},
+	"publishConfig": {
+		"allow-directory": "all"
+	},
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/sheplu/editorconfig.git"
