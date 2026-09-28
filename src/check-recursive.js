@@ -13,7 +13,7 @@ import {
 	summarizeReport,
 } from './check.js';
 import { logger } from './utils/logger.js';
-import { formatGlobalSummary } from './recursive-summary.js';
+import { directoryNoun, formatGlobalSummary } from './recursive-summary.js';
 
 function resolveStartDir(rawPath) {
 	const abs = resolve(rawPath);
@@ -202,6 +202,9 @@ function reportEmpty({ startDir, json, preset, skippedDirs }) {
 		return;
 	}
 	logger.log(`No .editorconfig files found under ${startDir}`);
+	if (skippedDirs.length > 0) {
+		logger.log(`${skippedDirs.length} unreadable ${directoryNoun(skippedDirs.length)} skipped`);
+	}
 }
 
 function runWalk({ startDir, paths, skippedDirs, parsedLanguages, strict, overrides, json, preset }) {

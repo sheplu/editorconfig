@@ -6,7 +6,6 @@ import {
 	expectedBodyForLanguage,
 	headerToLanguage,
 	languageToHeader,
-	parseSection,
 	resolveLanguageNames,
 } from '../templates/index.js';
 import { NOT_PROVIDED } from './options.js';
@@ -127,10 +126,30 @@ function appendInvalidLines(diffs, parsed) {
 	diffs.push({ header: 'invalid lines', status: 'invalid', lines: diagnostics });
 }
 
+function isCommentLine(line) {
+	return line.startsWith('#') || line.startsWith(';');
+}
+
+function isStrayPairLine(line) {
+	const equalsAt = line.indexOf('=');
+	if (isCommentLine(line) || equalsAt === -1) {
+		return false;
+	}
+	const key = line.slice(0, equalsAt).trim().toLowerCase();
+	return key.length > 0 && key !== 'root';
+}
+
+function pairFromLine(line) {
+	const equalsAt = line.indexOf('=');
+	return { key: line.slice(0, equalsAt).trim().toLowerCase(), value: line.slice(equalsAt + 1).trim() };
+}
+
+// Build the removal list from the source lines: the parsed Map collapses repeated keys and would hide lines the fix removes anyway.
 function strayPreamblePairs(parsed) {
-	const pairs = parseSection((parsed.preamble ?? []).join('\n'));
-	pairs.delete('root');
-	return [...pairs].map(([key, value]) => ({ key, value }));
+	return (parsed.preamble ?? [])
+		.map((rawLine) => rawLine.trim())
+		.filter((line) => isStrayPairLine(line))
+		.map((line) => pairFromLine(line));
 }
 
 function appendStrayPreamble(diffs, parsed) {

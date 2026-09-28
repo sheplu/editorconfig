@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
 	chmodSync,
+	lstatSync,
 	mkdtempSync,
 	readdirSync,
 	readFileSync,
@@ -78,6 +79,20 @@ describe('writeFileAtomic', () => {
 	});
 });
 
+describe('writeFileAtomic — mode preservation under umask', () => {
+	it('restores the original mode even when the umask masks it at creation', { skip: SKIP_LOCKED }, () => {
+		writeFileSync(state.target, 'old\n', { encoding: 'utf8', mode: 0o644 });
+		const previousUmask = process.umask(0o077);
+		try {
+			writeFileAtomic(state.target, 'new\n');
+		}
+		finally {
+			process.umask(previousUmask);
+		}
+		assert.ok(statSync(state.target).mode.toString(OCTAL).endsWith('644'), 'mode 0644 must survive a umask 077 replacement');
+	});
+});
+
 describe('writeFileAtomic — dangling symlinks', () => {
 	it('writes through a dangling symlink instead of replacing it', { skip: SKIP_SYMLINK }, () => {
 		const target = join(state.workdir, 'shared.editorconfig');
@@ -97,5 +112,20 @@ describe('writeFileAtomic — dangling symlinks', () => {
 		writeFileAtomic(link, 'root = true\n');
 		assert.equal(readFileSync(join(state.workdir, 'final.editorconfig'), 'utf8'), 'root = true\n');
 		assert.equal(realpathSync(link), realpathSync(join(state.workdir, 'final.editorconfig')));
+	});
+
+	it('throws ELOOP on a cyclic symlink instead of replacing it', { skip: SKIP_SYMLINK }, () => {
+		const first = join(state.workdir, 'cycle-a');
+		const second = join(state.workdir, 'cycle-b');
+		symlinkSync('cycle-b', first);
+		symlinkSync('cycle-a', second);
+		assert.throws(() => writeFileAtomic(first, 'root = true\n'), (error) => error.code === 'ELOOP');
+		assert.equal(lstatSync(first).isSymbolicLink(), true, 'the symlink must be left untouched');
+		assert.equal(lstatSync(second).isSymbolicLink(), true, 'the symlink must be left untouched');
+		assert.deepEqual(
+			readdirSync(state.workdir).filter((name) => name.startsWith('.cycle-a.tmp')),
+			[],
+			'no temp file may remain',
+		);
 	});
 });

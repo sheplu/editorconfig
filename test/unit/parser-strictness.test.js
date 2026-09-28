@@ -19,6 +19,14 @@ describe('baseSectionOutOfOrder', () => {
 		const { sections } = parseSections('root = true\n\n[*.md]\nindent_size = 2\n');
 		assert.equal(baseSectionOutOfOrder(sections), false);
 	});
+	it('flags a later duplicate [*] that follows a language section', () => {
+		const { sections } = parseSections('root = true\n\n[*]\nindent_style = tab\n\n[*.md]\nindent_size = 2\n\n[*]\nindent_size = 4\n');
+		assert.equal(baseSectionOutOfOrder(sections), true);
+	});
+	it('accepts duplicate [*] sections that all precede language sections', () => {
+		const { sections } = parseSections('root = true\n\n[*]\nindent_style = tab\n\n[*]\nindent_size = 4\n\n[*.md]\nindent_size = 2\n');
+		assert.equal(baseSectionOutOfOrder(sections), false);
+	});
 });
 
 describe('parseSection — value normalization', () => {

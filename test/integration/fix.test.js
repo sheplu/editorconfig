@@ -5,7 +5,7 @@ import { appendFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BUILTIN_BASE_FILE, OVERRIDE_BASE_MARKDOWN } from '../fixtures/editorconfig.js';
+import { BUILTIN_BASE_FILE, OVERRIDE_BASE_MARKDOWN, PYTHON_SECTION } from '../fixtures/editorconfig.js';
 
 const cliEntry = fileURLToPath(new URL('../../index.js', import.meta.url));
 
@@ -90,6 +90,19 @@ describe('fix mode — comment handling', () => {
 		assert.equal(result.status, 0, result.stderr);
 		assert.match(result.stdout, /- # keep tabs, see ADR-7 \(comment will be removed\)/u);
 		assert.doesNotMatch(readFileSync(state.target, 'utf8'), /ADR-7/u);
+	});
+
+	it('discloses comments from every copy of a duplicated header', () => {
+		const first = PYTHON_SECTION.replace('[*.py]\n', '[*.py]\n# first copy policy\n');
+		const second = PYTHON_SECTION.replace('[*.py]\n', '[*.py]\n# second copy policy\n');
+		writeFileSync(state.target, `${BUILTIN_BASE_FILE}\n${first}\n${second}`, 'utf8');
+		const result = runCli(['--mode=fix', `--path=${state.target}`, '--overwrite']);
+		assert.equal(result.status, 0, result.stderr);
+		assert.match(result.stdout, /- # first copy policy \(comment will be removed\)/u);
+		assert.match(result.stdout, /- # second copy policy \(comment will be removed\)/u);
+		const fixed = readFileSync(state.target, 'utf8');
+		assert.doesNotMatch(fixed, /copy policy/u, 'consolidation must drop every copy');
+		assert.equal(fixed.match(/^\[\*\.py\]$/gmu).length, 1, 'exactly one [*.py] section must remain');
 	});
 
 	it('preserves preamble comments above root = true', () => {

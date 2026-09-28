@@ -169,7 +169,13 @@ function flushRawBlock(state, blocks) {
 		return;
 	}
 	trimTrailingBlankLines(state.lines);
-	blocks.set(state.header, [state.header, ...state.lines].join('\n'));
+	const block = [state.header, ...state.lines].join('\n');
+	// Keep every copy of a duplicated header: consolidation drops comments from every copy, and consumers must be able to disclose each one before that happens.
+	if (blocks.has(state.header)) {
+		blocks.set(state.header, `${blocks.get(state.header)}\n\n${block}`);
+		return;
+	}
+	blocks.set(state.header, block);
 }
 
 function processRawLine(state, blocks, line) {

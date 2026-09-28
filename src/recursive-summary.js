@@ -14,7 +14,7 @@ function aggregateCounts(entries, strict) {
 	return totals;
 }
 
-function directoryNoun(count) {
+export function directoryNoun(count) {
 	if (count === 1) {
 		return 'directory';
 	}
