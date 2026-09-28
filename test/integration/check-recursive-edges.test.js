@@ -180,3 +180,20 @@ describe('check --recursive — language filter validation', () => {
 		assert.match(empty.stdout, /No \.editorconfig files found/u);
 	});
 });
+
+describe('check --recursive — child section order', () => {
+	it('fails a child whose [*] comes after language sections', () => {
+		writeFile('.editorconfig', VALID_ROOT);
+		writeFile('sub/.editorconfig', '[*.md]\nindent_size = 2\n\n[*]\nindent_style = tab\n');
+		const result = runCli(['--mode=check', '--recursive']);
+		assert.notEqual(result.status, 0);
+		assert.match(result.stdout, /must come before language sections/u);
+	});
+
+	it('still passes a child that declares [*] before language sections', () => {
+		writeFile('.editorconfig', VALID_ROOT);
+		writeFile('sub/.editorconfig', '[*]\nindent_style = tab\n\n[*.md]\nindent_size = 2\n');
+		const result = runCli(['--mode=check', '--recursive']);
+		assert.equal(result.status, 0, result.stderr);
+	});
+});

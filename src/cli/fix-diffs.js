@@ -77,11 +77,20 @@ function resolveSectionLanguage(section) {
 	return headerToLanguage(section.header);
 }
 
+function removedPairs(body) {
+	return [...body].map(([key, value]) => ({ key, value }));
+}
+
 function buildSectionDiff(section, overrides) {
 	const language = resolveSectionLanguage(section);
 
 	if (!language) {
-		return { header: section.header, status: 'unknown' };
+		// Itemize the pairs so the preview shows what the removal deletes.
+		return {
+			header: section.header,
+			status: 'unknown',
+			keys: { removed: removedPairs(section.body), added: [], changed: [] },
+		};
 	}
 
 	const expected = expectedBodyForLanguage(language, overrides);
@@ -192,12 +201,30 @@ function preambleRootDeclarations(parsed) {
 		.filter((line) => !isCommentLine(line) && pairFromLine(line).key === 'root');
 }
 
-function flagMissingRoot(diffs, parsed) {
+function flagMissingRoot(diffs, discardedRoots) {
 	const baseDiff = flagBaseDiff(diffs, 'rootMissing');
-	const discardedRoots = preambleRootDeclarations(parsed);
 	if (discardedRoots.length > 0) {
 		baseDiff.discardedRoots = discardedRoots;
 	}
+}
+
+// A rewrite keeps exactly one `root = true`: with hasRoot set, every earlier declaration is superseded.
+// Disclose those earlier lines in the preview, since the rewrite removes them.
+function flagSupersededRoots(diffs, rootDeclarations) {
+	if (rootDeclarations.length < 2) {
+		return;
+	}
+	const baseDiff = flagBaseDiff(diffs, 'normalizedRoot');
+	baseDiff.discardedRoots = rootDeclarations.slice(0, -1);
+}
+
+function flagRootChanges(diffs, parsed) {
+	const rootDeclarations = preambleRootDeclarations(parsed);
+	if (parsed.hasRoot) {
+		flagSupersededRoots(diffs, rootDeclarations);
+		return;
+	}
+	flagMissingRoot(diffs, rootDeclarations);
 }
 
 export function buildSectionDiffs(parsed, targetLanguages, overrides) {
@@ -209,9 +236,7 @@ export function buildSectionDiffs(parsed, targetLanguages, overrides) {
 	if (baseSectionOutOfOrder(parsed.sections)) {
 		flagBaseDiff(diffs, 'outOfOrder');
 	}
-	if (!parsed.hasRoot) {
-		flagMissingRoot(diffs, parsed);
-	}
+	flagRootChanges(diffs, parsed);
 	return diffs;
 }
 

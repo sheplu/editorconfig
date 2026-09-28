@@ -52,7 +52,7 @@ const STATUS_GLYPHS = {
 	unknown: '⚠️ ',
 };
 
-function flagNoteLines(diff) {
+function rootNoteLines(diff) {
 	const notes = [];
 	if (diff.rootMissing) {
 		for (const declaration of diff.discardedRoots ?? []) {
@@ -60,6 +60,16 @@ function flagNoteLines(diff) {
 		}
 		notes.push("    + root = true (missing preamble)");
 	}
+	if (diff.normalizedRoot) {
+		for (const declaration of diff.discardedRoots) {
+			notes.push(`    - ${declaration} (superseded by the last root declaration)`);
+		}
+	}
+	return notes;
+}
+
+function flagNoteLines(diff) {
+	const notes = rootNoteLines(diff);
 	if (diff.outOfOrder) {
 		notes.push('    ~ section order will be normalized ([*] first)');
 	}
@@ -128,7 +138,8 @@ function commentLines(block) {
 function annotateDroppedComments(diffs, rawBlocks) {
 	const annotated = new Set();
 	for (const diff of diffs) {
-		if (!annotated.has(diff.header) && diff.bodyMatches === false && rawBlocks.has(diff.header)) {
+		const removesRawBlock = diff.bodyMatches === false || diff.status === 'unknown';
+		if (!annotated.has(diff.header) && removesRawBlock && rawBlocks.has(diff.header)) {
 			const dropped = commentLines(rawBlocks.get(diff.header));
 			if (dropped.length > 0) {
 				diff.droppedComments = dropped;

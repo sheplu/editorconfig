@@ -144,6 +144,33 @@ describe('fix mode — stray preamble pairs', () => {
 	});
 });
 
+describe('fix mode — superseded root declarations', () => {
+	it('discloses the removal of an overridden root = false line', () => {
+		const content = BUILTIN_BASE_FILE
+			.replace('root = true\n', 'root = false\nroot = true\n')
+			.replace('indent_size = 4', 'indent_size = 2');
+		writeFileSync(state.target, content, 'utf8');
+		const result = runCli(['--mode=fix', `--path=${state.target}`, '--overwrite']);
+		assert.equal(result.status, 0, result.stderr);
+		assert.match(result.stdout, /- root = false \(superseded by the last root declaration\)/u);
+		const fixed = readFileSync(state.target, 'utf8');
+		assert.equal(fixed.match(/^root = /gmu).length, 1, 'exactly one root declaration must remain');
+	});
+});
+
+describe('fix mode — unknown section itemization', () => {
+	it('itemizes the pairs and comments an unknown-section removal deletes', () => {
+		const content = `${BUILTIN_BASE_FILE}\n[Cargo.toml]\n# keep this crate config\nfoo = bar\n`;
+		writeFileSync(state.target, content, 'utf8');
+		const result = runCli(['--mode=fix', `--path=${state.target}`, '--overwrite']);
+		assert.equal(result.status, 0, result.stderr);
+		assert.match(result.stdout, /\[Cargo\.toml\] — unknown \(will be removed\)/u);
+		assert.match(result.stdout, /- foo = bar/u);
+		assert.match(result.stdout, /- # keep this crate config \(comment will be removed\)/u);
+		assert.doesNotMatch(readFileSync(state.target, 'utf8'), /Cargo\.toml/u);
+	});
+});
+
 describe('fix mode — duplicate sections', () => {
 	it('consolidates identical duplicate sections and discloses it', () => {
 		const content = `${BUILTIN_BASE_FILE}\n[*.py]\nindent_style = space\nindent_size = 4\nmax_line_length = 88\n\n[*.py]\nindent_style = space\nindent_size = 4\nmax_line_length = 88\n`;
