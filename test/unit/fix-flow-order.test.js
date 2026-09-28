@@ -89,6 +89,34 @@ describe('buildSectionDiffs — missing root display (all base statuses)', () =>
 	});
 });
 
+describe('buildSectionDiffs — discarded root declarations', () => {
+	it('discloses root declarations the root = true rewrite discards', () => {
+		const parsed = parseSections(`root = false\n\n[*]\n${BUILTIN_BASE_BODY}`);
+		const diffs = buildSectionDiffs(parsed, [], EMPTY_OVERRIDES);
+		const baseDiff = diffs.find((diff) => diff.header === '[*]');
+		assert.equal(baseDiff.rootMissing, true);
+		assert.deepEqual(baseDiff.discardedRoots, ['root = false']);
+		const output = formatDiff(diffs, '.editorconfig');
+		assert.match(output, /- root = false \(will be replaced by root = true\)/u);
+		assert.match(output, /\+ root = true \(missing preamble\)/u);
+	});
+
+	it('discloses every discarded root declaration, not just the last', () => {
+		const parsed = parseSections(`root = false\nroot = maybe\n\n[*]\n${BUILTIN_BASE_BODY}`);
+		const diffs = buildSectionDiffs(parsed, [], EMPTY_OVERRIDES);
+		const baseDiff = diffs.find((diff) => diff.header === '[*]');
+		assert.deepEqual(baseDiff.discardedRoots, ['root = false', 'root = maybe']);
+	});
+
+	it('does not disclose roots when the preamble has no root declaration', () => {
+		const parsed = parseSections(`[*]\n${BUILTIN_BASE_BODY}`);
+		const diffs = buildSectionDiffs(parsed, [], EMPTY_OVERRIDES);
+		const baseDiff = diffs.find((diff) => diff.header === '[*]');
+		assert.equal(baseDiff.rootMissing, true);
+		assert.equal('discardedRoots' in baseDiff, false);
+	});
+});
+
 describe('buildSectionDiffs — stray preamble pairs', () => {
 	it('reports non-root preamble pairs as removable stray entries', () => {
 		const parsed = parseSections(`root = true\ncharset = latin1\n\n[*]\n${BUILTIN_BASE_BODY}`);

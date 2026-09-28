@@ -55,6 +55,9 @@ const STATUS_GLYPHS = {
 function flagNoteLines(diff) {
 	const notes = [];
 	if (diff.rootMissing) {
+		for (const declaration of diff.discardedRoots ?? []) {
+			notes.push(`    - ${declaration} (will be replaced by root = true)`);
+		}
 		notes.push("    + root = true (missing preamble)");
 	}
 	if (diff.outOfOrder) {
@@ -121,12 +124,15 @@ function commentLines(block) {
 	return block.split('\n').filter((line) => isCommentLine(line));
 }
 
+// The raw block concatenates every copy of a duplicated header: annotate only the first diff per header so each dropped comment is disclosed exactly once.
 function annotateDroppedComments(diffs, rawBlocks) {
+	const annotated = new Set();
 	for (const diff of diffs) {
-		if (diff.bodyMatches === false && rawBlocks.has(diff.header)) {
+		if (!annotated.has(diff.header) && diff.bodyMatches === false && rawBlocks.has(diff.header)) {
 			const dropped = commentLines(rawBlocks.get(diff.header));
 			if (dropped.length > 0) {
 				diff.droppedComments = dropped;
+				annotated.add(diff.header);
 			}
 		}
 	}
