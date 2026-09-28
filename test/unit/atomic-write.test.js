@@ -129,3 +129,13 @@ describe('writeFileAtomic — dangling symlinks', () => {
 		);
 	});
 });
+
+describe('writeFileAtomic — write-protected target', () => {
+	it('refuses to replace a read-only file, like plain writeFileSync', { skip: SKIP_LOCKED }, () => {
+		writeFileSync(state.target, 'locked content\n', { encoding: 'utf8', mode: 0o444 });
+		assert.throws(() => writeFileAtomic(state.target, 'replacement\n'), /EACCES|EPERM/u);
+		chmodSync(state.target, 0o644);
+		assert.equal(readFileSync(state.target, 'utf8'), 'locked content\n');
+		assert.deepEqual(readdirSync(state.workdir), ['.editorconfig'], 'no temp file may remain');
+	});
+});
