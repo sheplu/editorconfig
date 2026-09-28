@@ -108,6 +108,10 @@ function buildChildBaseIssues(parsed) {
 	if (parsed.hasRoot) {
 		return [{ header: BASE_SECTION_HEADER, status: 'child-root-forbidden' }];
 	}
+	// A child may omit [*], but a [*] declared after language sections still overrides them (later sections win).
+	if (baseSectionOutOfOrder(parsed.sections)) {
+		return [{ header: BASE_SECTION_HEADER, status: 'out-of-order' }];
+	}
 	return [];
 }
 

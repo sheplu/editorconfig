@@ -175,3 +175,38 @@ describe('buildSectionDiffs — duplicate headers', () => {
 		assert.equal(diffs.some((diff) => diff.duplicate), false);
 	});
 });
+
+describe('buildSectionDiffs — superseded root declarations', () => {
+	it('discloses earlier root declarations when a later one wins', () => {
+		const parsed = parseSections(`root = false\nroot = true\n\n[*]\n${BUILTIN_BASE_BODY}`);
+		const diffs = buildSectionDiffs(parsed, [], EMPTY_OVERRIDES);
+		const baseDiff = diffs.find((diff) => diff.header === '[*]');
+		assert.equal(baseDiff.normalizedRoot, true);
+		assert.deepEqual(baseDiff.discardedRoots, ['root = false']);
+		assert.equal(hasChanges(diffs), true, 'normalizing the preamble is a change');
+		const output = formatDiff(diffs, '.editorconfig');
+		assert.match(output, /- root = false \(superseded by the last root declaration\)/u);
+	});
+
+	it('does not flag a preamble with a single root declaration', () => {
+		const parsed = parseSections(`root = true\n\n[*]\n${BUILTIN_BASE_BODY}`);
+		const diffs = buildSectionDiffs(parsed, [], EMPTY_OVERRIDES);
+		assert.equal(diffs.some((diff) => diff.normalizedRoot), false);
+		assert.equal(hasChanges(diffs), false);
+	});
+});
+
+describe('buildSectionDiffs — unknown section itemization', () => {
+	it('lists the pairs an unknown-section removal deletes', () => {
+		const parsed = parseSections(`${BUILTIN_BASE_FILE}\n[Cargo.toml]\nfoo = bar\nbaz = qux\n`);
+		const diffs = buildSectionDiffs(parsed, [], EMPTY_OVERRIDES);
+		const unknownDiff = diffs.find((diff) => diff.status === 'unknown');
+		assert.deepEqual(unknownDiff.keys.removed, [
+			{ key: 'foo', value: 'bar' },
+			{ key: 'baz', value: 'qux' },
+		]);
+		const output = formatDiff(diffs, '.editorconfig');
+		assert.match(output, /- foo = bar/u);
+		assert.match(output, /- baz = qux/u);
+	});
+});
