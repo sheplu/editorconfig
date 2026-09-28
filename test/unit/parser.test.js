@@ -5,6 +5,7 @@ import {
 	bodyAfterFirstHeader,
 	compareSection,
 	expectedBodyForLanguage,
+	extractRawSections,
 	headerToLanguage,
 	languageToHeader,
 	parseSection,
@@ -273,5 +274,18 @@ describe('resolveLanguageNames — typos and edge inputs', () => {
 			() => resolveLanguageNames(['markdown', 'unknownish', 'python']),
 			/unknown language: 'unknownish'/u,
 		);
+	});
+});
+
+describe('extractRawSections — duplicate headers', () => {
+	it('keeps every copy of a duplicated header', () => {
+		const blocks = extractRawSections('[*.md]\n# first note\nindent_size = 2\n\n[*.md]\n# second note\nindent_size = 2\n');
+		const block = blocks.get('[*.md]');
+		assert.match(block, /# first note/u);
+		assert.match(block, /# second note/u);
+	});
+	it('returns a unique header unchanged', () => {
+		const blocks = extractRawSections('[*]\nindent_style = tab\n');
+		assert.equal(blocks.get('[*]'), '[*]\nindent_style = tab');
 	});
 });

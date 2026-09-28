@@ -150,6 +150,23 @@ describe('check --recursive — unreadable directories', () => {
 	});
 });
 
+describe('check --recursive — unreadable directories on an empty scan', () => {
+	it('mentions skipped directories when the scan finds no files', { skip: SKIP_LOCKED }, () => {
+		const locked = join(state.workdir, 'locked');
+		mkdirSync(locked, { recursive: true });
+		chmodSync(locked, 0o000);
+		try {
+			const result = runCli(['--mode=check', '--recursive']);
+			assert.equal(result.status, 0, result.stderr);
+			assert.match(result.stdout, /No \.editorconfig files found/u);
+			assert.match(result.stdout, /1 unreadable directory skipped/u);
+		}
+		finally {
+			chmodSync(locked, 0o755);
+		}
+	});
+});
+
 describe('check --recursive — language filter validation', () => {
 	it('rejects an unknown language even when the scan finds no files', () => {
 		const result = runCli(['--mode=check', '--recursive', '--languages=typo']);

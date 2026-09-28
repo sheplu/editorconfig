@@ -117,6 +117,17 @@ describe('check (inferred mode) — section order', () => {
 		const payload = JSON.parse(checked.stdout);
 		assert.ok(payload.sections.some((section) => section.status === 'out-of-order'));
 	});
+
+	it('FAILs when a trailing duplicate [*] overrides language sections', () => {
+		writeSubset('md');
+		// A second [*] with canonical values still shadows [*.md] for matching files (later sections win).
+		appendFileSync(state.target, `\n[*]\n${BUILTIN_BASE_BODY}`, 'utf8');
+
+		const checked = runCli(['--mode=check', `--path=${state.target}`]);
+		assert.notEqual(checked.status, 0);
+		assert.match(checked.stdout, /\bFAIL\b/u);
+		assert.match(checked.stdout, /must come before language sections/u);
+	});
 });
 
 describe('check (inferred mode) — invalid syntax', () => {

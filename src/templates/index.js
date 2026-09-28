@@ -158,13 +158,19 @@ export function headerToLanguage(header) {
 
 // Later matching sections take precedence (spec: file processing), so
 // [*] must be declared before any language section in a canonical file.
+// A later duplicate is equally dangerous: it silently overrides the language sections' settings.
 export function baseSectionOutOfOrder(sections) {
-	const baseAt = sections.findIndex((section) => section.header === BASE_HEADER);
-	if (baseAt === -1) {
+	let lastBaseAt = -1;
+	for (const [index, section] of sections.entries()) {
+		if (section.header === BASE_HEADER) {
+			lastBaseAt = index;
+		}
+	}
+	if (lastBaseAt === -1) {
 		return false;
 	}
 	const firstKnownAt = sections.findIndex((section) => HEADER_TO_LANGUAGE.has(section.header));
-	return firstKnownAt !== -1 && firstKnownAt < baseAt;
+	return firstKnownAt !== -1 && firstKnownAt < lastBaseAt;
 }
 
 export function expectedBodyForLanguage(language, overrides = EMPTY_OVERRIDES) {

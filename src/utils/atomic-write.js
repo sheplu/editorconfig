@@ -1,4 +1,5 @@
-import { existsSync, lstatSync, readlinkSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, lstatSync, readlinkSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 
 const MAX_LINK_DEPTH = 40;
@@ -22,9 +23,17 @@ function readLinkTarget(path) {
 
 function resolveDanglingLink(path) {
 	// A dangling symlink has no realpath, but writeFileSync still follows it and creates its target — do the same.
+	// A cycle never leaves the chain on its own and plain writeFileSync fails with ELOOP there — so does this.
 	let current = path;
-	for (let depth = 0; depth < MAX_LINK_DEPTH && isSymlink(current); depth += 1) {
+	let depth = 0;
+	while (isSymlink(current)) {
+		if (depth >= MAX_LINK_DEPTH) {
+			const error = new Error(`ELOOP: too many symbolic links encountered, open '${path}'`);
+			error.code = 'ELOOP';
+			throw error;
+		}
 		current = readLinkTarget(current);
+		depth += 1;
 	}
 	return current;
 }
@@ -37,28 +46,38 @@ function resolveTarget(path) {
 	return resolveDanglingLink(path);
 }
 
-const TIMESTAMP_RADIX = 36;
-
+// An unpredictable name plus exclusive ('wx') creation means a pre-existing entry (e.g. a symlink) can never redirect the write.
 function tempPathFor(target) {
-	const suffix = `${process.pid}-${Date.now().toString(TIMESTAMP_RADIX)}`;
-	return join(dirname(target), `.${basename(target)}.tmp-${suffix}`);
+	return join(dirname(target), `.${basename(target)}.tmp-${process.pid}-${randomUUID()}`);
 }
 
-function writeOptionsFor(target) {
-	if (existsSync(target)) {
-		// Preserve the destination's permissions across the replacement.
-		return { encoding: 'utf8', mode: statSync(target).mode };
+function createTemp(target, content) {
+	for (;;) {
+		const temp = tempPathFor(target);
+		try {
+			writeFileSync(temp, content, { encoding: 'utf8', flag: 'wx' });
+			return temp;
+		}
+		catch (error) {
+			if (error.code !== 'EEXIST') {
+				// The 'wx' flag guarantees any file at temp was created by this call.
+				rmSync(temp, { force: true });
+				throw error;
+			}
+		}
 	}
-	return { encoding: 'utf8' };
 }
 
 // A truncating write that fails midway destroys the previous content.
 // Write to a sibling temp file and rename, so the original survives failures.
 export function writeFileAtomic(path, content) {
 	const target = resolveTarget(path);
-	const temp = tempPathFor(target);
+	const temp = createTemp(target, content);
 	try {
-		writeFileSync(temp, content, writeOptionsFor(target));
+		if (existsSync(target)) {
+			// Creation applies the process umask, so restore the destination's permissions before the rename.
+			chmodSync(temp, statSync(target).mode);
+		}
 		renameSync(temp, target);
 	}
 	catch (error) {

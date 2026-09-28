@@ -108,6 +108,16 @@ describe('buildSectionDiffs — stray preamble pairs', () => {
 		assert.match(output, /- charset = latin1/u);
 	});
 
+	it('lists every repeated preamble key from the source lines', () => {
+		const parsed = parseSections(`root = true\nfoo = first\nfoo = second\n\n[*]\n${BUILTIN_BASE_BODY}`);
+		const diffs = buildSectionDiffs(parsed, [], EMPTY_OVERRIDES);
+		const stray = diffs.find((diff) => diff.status === 'stray');
+		assert.deepEqual(stray.keys.removed, [
+			{ key: 'foo', value: 'first' },
+			{ key: 'foo', value: 'second' },
+		]);
+	});
+
 	it('does not flag a preamble that only declares root', () => {
 		const parsed = parseSections(`root = true\n\n[*]\n${BUILTIN_BASE_BODY}`);
 		const diffs = buildSectionDiffs(parsed, [], EMPTY_OVERRIDES);
