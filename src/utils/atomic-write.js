@@ -1,8 +1,12 @@
-import { chmodSync, existsSync, lstatSync, readlinkSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { accessSync, chmodSync, constants, existsSync, lstatSync, readlinkSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 
 const MAX_LINK_DEPTH = 40;
+
+// Octal span of the permission bits: st_mode % MODE_PERMISSION_SPAN strips the file-type bits.
+// POSIX leaves chmod's treatment of the non-permission bits unspecified.
+const MODE_PERMISSION_SPAN = 0o1_0000;
 
 function isSymlink(path) {
 	try {
@@ -72,11 +76,15 @@ function createTemp(target, content) {
 // Write to a sibling temp file and rename, so the original survives failures.
 export function writeFileAtomic(path, content) {
 	const target = resolveTarget(path);
+	if (existsSync(target)) {
+		// Renaming only needs directory permission; refuse write-protected targets like plain writeFileSync does.
+		accessSync(target, constants.W_OK);
+	}
 	const temp = createTemp(target, content);
 	try {
 		if (existsSync(target)) {
 			// Creation applies the process umask, so restore the destination's permissions before the rename.
-			chmodSync(temp, statSync(target).mode);
+			chmodSync(temp, statSync(target).mode % MODE_PERMISSION_SPAN);
 		}
 		renameSync(temp, target);
 	}
