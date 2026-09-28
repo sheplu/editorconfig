@@ -11,7 +11,7 @@ import {
 function compose(text, targetLanguages = [], overrides = EMPTY_OVERRIDES) {
 	const parsed = parseSections(text);
 	const diffs = buildSectionDiffs(parsed, targetLanguages, overrides);
-	return composeFixedContent({ text, parsed, diffs, targetLanguages, overrides });
+	return composeFixedContent({ parsed, diffs, targetLanguages, overrides });
 }
 
 describe('composeFixedContent — canonical input', () => {

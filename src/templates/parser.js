@@ -1,5 +1,10 @@
+export function isCommentLine(line) {
+	const trimmed = line.trim();
+	return trimmed.startsWith('#') || trimmed.startsWith(';');
+}
+
 function isIgnoredLine(line) {
-	if (line === '' || line.startsWith('#') || line.startsWith(';')) {
+	if (line === '' || isCommentLine(line)) {
 		return true;
 	}
 	if (line.startsWith('[') && line.endsWith(']')) {
@@ -53,6 +58,7 @@ function finishSection({ header, lines }) {
 	return {
 		header,
 		body: parseSection(lines.join('\n')),
+		lines,
 	};
 }
 
@@ -111,7 +117,13 @@ export function parseSections(text) {
 	const { sections, preamble } = splitSections(lines);
 	// Last root declaration wins, like every other pair (spec: file processing order).
 	const hasRoot = (parseSection(preamble.join('\n')).get('root') ?? '').toLowerCase() === 'true';
-	return { hasRoot, sections, preamble, diagnostics: collectDiagnostics(lines) };
+	return {
+		hasRoot,
+		sections,
+		preamble,
+		diagnostics: collectDiagnostics(lines),
+		rawBlocks: rawBlocksFrom(sections),
+	};
 }
 
 export function compareSection(actualBody, expectedBody) {
@@ -156,48 +168,33 @@ export function stripInvalidLines(block) {
 		.join('\n');
 }
 
-const NO_HEADER = '';
-
-function trimTrailingBlankLines(lines) {
-	while (lines.length > 0 && lines.at(-1).trim() === '') {
-		lines.pop();
+function withoutTrailingBlankLines(lines) {
+	let end = lines.length;
+	while (end > 0 && lines[end - 1].trim() === '') {
+		end -= 1;
 	}
+	return lines.slice(0, end);
 }
 
-function flushRawBlock(state, blocks) {
-	if (state.header === NO_HEADER) {
-		return;
-	}
-	trimTrailingBlankLines(state.lines);
-	const block = [state.header, ...state.lines].join('\n');
-	// Keep every copy of a duplicated header: consolidation drops comments from every copy, and consumers must be able to disclose each one before that happens.
-	if (blocks.has(state.header)) {
-		blocks.set(state.header, `${blocks.get(state.header)}\n\n${block}`);
-		return;
-	}
-	blocks.set(state.header, block);
+function rawBlockOf(section) {
+	return [section.header, ...withoutTrailingBlankLines(section.lines)].join('\n');
 }
 
-function processRawLine(state, blocks, line) {
-	const trimmed = line.trim();
-	if (/^\[.*\]$/u.test(trimmed)) {
-		flushRawBlock(state, blocks);
-		state.header = trimmed;
-		state.lines = [];
-		return;
+function rawBlocksFrom(sections) {
+	const blocks = new Map();
+	for (const section of sections) {
+		const block = rawBlockOf(section);
+		// Keep every copy of a duplicated header: consolidation drops comments from every copy, and consumers must be able to disclose each one before that happens.
+		if (blocks.has(section.header)) {
+			blocks.set(section.header, `${blocks.get(section.header)}\n\n${block}`);
+		}
+		else {
+			blocks.set(section.header, block);
+		}
 	}
-	if (state.header !== NO_HEADER) {
-		state.lines.push(line);
-	}
+	return blocks;
 }
 
 export function extractRawSections(text) {
-	const normalized = text.replaceAll(/\r\n?/gu, '\n');
-	const blocks = new Map();
-	const state = { header: NO_HEADER, lines: [] };
-	for (const line of normalized.split('\n')) {
-		processRawLine(state, blocks, line);
-	}
-	flushRawBlock(state, blocks);
-	return blocks;
+	return parseSections(text).rawBlocks;
 }

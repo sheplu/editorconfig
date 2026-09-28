@@ -50,6 +50,7 @@ export {
 	compareSection,
 	extractRawSections,
 	fromFirstHeader,
+	isCommentLine,
 	parseSection,
 	parseSections,
 	stripInvalidLines,

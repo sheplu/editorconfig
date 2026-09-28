@@ -5,6 +5,7 @@ import {
 	compareSection,
 	expectedBodyForLanguage,
 	headerToLanguage,
+	isCommentLine,
 	languageToHeader,
 	resolveLanguageNames,
 } from '../templates/index.js';
@@ -136,10 +137,6 @@ function appendInvalidLines(diffs, parsed) {
 	diffs.push({ header: 'invalid lines', status: 'invalid', lines: diagnostics });
 }
 
-function isCommentLine(line) {
-	return line.startsWith('#') || line.startsWith(';');
-}
-
 function isStrayPairLine(line) {
 	const equalsAt = line.indexOf('=');
 	if (isCommentLine(line) || equalsAt === -1) {
@@ -227,6 +224,25 @@ function flagRootChanges(diffs, parsed) {
 	flagMissingRoot(diffs, rootDeclarations);
 }
 
+function commentLines(block) {
+	return block.split('\n').filter((line) => isCommentLine(line));
+}
+
+// The raw block concatenates every copy of a duplicated header, so each dropped comment is disclosed exactly once on the header's first diff.
+function annotateDroppedComments(diffs, rawBlocks) {
+	const annotated = new Set();
+	for (const diff of diffs) {
+		const removesRawBlock = diff.bodyMatches === false || diff.status === 'unknown';
+		if (!annotated.has(diff.header) && removesRawBlock && rawBlocks.has(diff.header)) {
+			const dropped = commentLines(rawBlocks.get(diff.header));
+			if (dropped.length > 0) {
+				diff.droppedComments = dropped;
+				annotated.add(diff.header);
+			}
+		}
+	}
+}
+
 export function buildSectionDiffs(parsed, targetLanguages, overrides) {
 	const diffs = parsed.sections.map((section) => buildSectionDiff(section, overrides));
 	appendMissingSections(diffs, parsed, targetLanguages);
@@ -237,6 +253,7 @@ export function buildSectionDiffs(parsed, targetLanguages, overrides) {
 		flagBaseDiff(diffs, 'outOfOrder');
 	}
 	flagRootChanges(diffs, parsed);
+	annotateDroppedComments(diffs, parsed.rawBlocks ?? new Map());
 	return diffs;
 }
 
