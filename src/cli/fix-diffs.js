@@ -116,6 +116,7 @@ function flagBaseDiff(diffs, flag) {
 		baseDiff.status = 'mismatch';
 		baseDiff.keys = { removed: [], added: [], changed: [] };
 	}
+	return baseDiff;
 }
 
 function appendInvalidLines(diffs, parsed) {
@@ -183,6 +184,22 @@ function markDuplicates(diffs) {
 	}
 }
 
+// When hasRoot is false, every root declaration in the preamble is discarded by the
+// `root = true` rewrite. Collect them so the preview can disclose the removal.
+function preambleRootDeclarations(parsed) {
+	return (parsed.preamble ?? [])
+		.map((rawLine) => rawLine.trim())
+		.filter((line) => !isCommentLine(line) && pairFromLine(line).key === 'root');
+}
+
+function flagMissingRoot(diffs, parsed) {
+	const baseDiff = flagBaseDiff(diffs, 'rootMissing');
+	const discardedRoots = preambleRootDeclarations(parsed);
+	if (discardedRoots.length > 0) {
+		baseDiff.discardedRoots = discardedRoots;
+	}
+}
+
 export function buildSectionDiffs(parsed, targetLanguages, overrides) {
 	const diffs = parsed.sections.map((section) => buildSectionDiff(section, overrides));
 	appendMissingSections(diffs, parsed, targetLanguages);
@@ -193,7 +210,7 @@ export function buildSectionDiffs(parsed, targetLanguages, overrides) {
 		flagBaseDiff(diffs, 'outOfOrder');
 	}
 	if (!parsed.hasRoot) {
-		flagBaseDiff(diffs, 'rootMissing');
+		flagMissingRoot(diffs, parsed);
 	}
 	return diffs;
 }

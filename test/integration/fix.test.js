@@ -27,6 +27,13 @@ function runCli(args) {
 	});
 }
 
+function countListedComments(stdout, comment) {
+	const marker = `- ${comment} (comment will be removed)`;
+	const occurrences = stdout.split(marker).length - 1;
+	assert.ok(occurrences > 0, `expected a disclosure for ${comment}`);
+	return occurrences;
+}
+
 describe('fix mode — nothing to fix', () => {
 	it('prints nothing to fix when the file already matches', () => {
 		writeFileSync(state.target, BUILTIN_BASE_FILE, 'utf8');
@@ -57,6 +64,16 @@ describe('fix mode — applying fixes with --overwrite', () => {
 
 		const content = readFileSync(state.target, 'utf8');
 		assert.match(content, /^root = true/u);
+	});
+
+	it('discloses a discarded root = false declaration and rewrites it', () => {
+		const content = BUILTIN_BASE_FILE.replace('root = true', 'root = false');
+		writeFileSync(state.target, content, 'utf8');
+		const result = runCli(['--mode=fix', `--path=${state.target}`, '--overwrite']);
+		assert.equal(result.status, 0, result.stderr);
+		assert.match(result.stdout, /- root = false \(will be replaced by root = true\)/u);
+		assert.match(result.stdout, /\+ root = true \(missing preamble\)/u);
+		assert.doesNotMatch(readFileSync(state.target, 'utf8'), /root = false/u);
 	});
 
 	it('adds a missing language section when --languages is passed', () => {
@@ -98,8 +115,8 @@ describe('fix mode — comment handling', () => {
 		writeFileSync(state.target, `${BUILTIN_BASE_FILE}\n${first}\n${second}`, 'utf8');
 		const result = runCli(['--mode=fix', `--path=${state.target}`, '--overwrite']);
 		assert.equal(result.status, 0, result.stderr);
-		assert.match(result.stdout, /- # first copy policy \(comment will be removed\)/u);
-		assert.match(result.stdout, /- # second copy policy \(comment will be removed\)/u);
+		assert.equal(countListedComments(result.stdout, '# first copy policy'), 1, 'each dropped comment must be listed exactly once');
+		assert.equal(countListedComments(result.stdout, '# second copy policy'), 1, 'each dropped comment must be listed exactly once');
 		const fixed = readFileSync(state.target, 'utf8');
 		assert.doesNotMatch(fixed, /copy policy/u, 'consolidation must drop every copy');
 		assert.equal(fixed.match(/^\[\*\.py\]$/gmu).length, 1, 'exactly one [*.py] section must remain');
