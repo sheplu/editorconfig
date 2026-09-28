@@ -1,7 +1,6 @@
 import {
 	AVAILABLE_LANGUAGES,
 	BASE_SECTION_HEADER,
-	extractRawSections,
 	headerToLanguage,
 	languageToHeader,
 	parseSections,
@@ -60,8 +59,7 @@ function rawSectionFor(language, rawBlocks) {
 	return rawBlocks.get(languageToHeader(language));
 }
 
-function buildRawSections(bodies, text) {
-	const rawBlocks = extractRawSections(text);
+function buildRawSections(bodies, rawBlocks) {
 	const rawSections = new Map();
 	for (const language of bodies.keys()) {
 		rawSections.set(language, rawSectionFor(language, rawBlocks));
@@ -92,6 +90,6 @@ export async function loadCustomTemplate(input) {
 			`custom template '${input}' redefines [*] but is missing 'root = true' in the preamble`,
 		);
 	}
-	const rawSections = buildRawSections(bodies, text);
+	const rawSections = buildRawSections(bodies, parsed.rawBlocks);
 	return { bodies, rawSections, hasRoot: parsed.hasRoot };
 }

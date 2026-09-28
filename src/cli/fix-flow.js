@@ -2,8 +2,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import {
 	AVAILABLE_LANGUAGES,
 	BASE_SECTION_HEADER,
-	extractRawSections,
 	fromFirstHeader,
+	isCommentLine,
 	joinSections,
 	languageToHeader,
 	parseSections,
@@ -125,38 +125,12 @@ function confirmFix() {
 	return ask('Apply these changes? [y/N] ');
 }
 
-function isCommentLine(line) {
-	const trimmed = line.trim();
-	return trimmed.startsWith('#') || trimmed.startsWith(';');
-}
-
-function commentLines(block) {
-	return block.split('\n').filter((line) => isCommentLine(line));
-}
-
-// The raw block concatenates every copy of a duplicated header: annotate only the first diff per header so each dropped comment is disclosed exactly once.
-function annotateDroppedComments(diffs, rawBlocks) {
-	const annotated = new Set();
-	for (const diff of diffs) {
-		const removesRawBlock = diff.bodyMatches === false || diff.status === 'unknown';
-		if (!annotated.has(diff.header) && removesRawBlock && rawBlocks.has(diff.header)) {
-			const dropped = commentLines(rawBlocks.get(diff.header));
-			if (dropped.length > 0) {
-				diff.droppedComments = dropped;
-				annotated.add(diff.header);
-			}
-		}
-	}
-}
-
 function buildFixDiffs(path, parsedLanguages, overrides) {
 	const text = readFileSync(path, 'utf8');
 	const parsed = parseSections(text);
 	const targetLanguages = resolveTargetLanguages(parsed, parsedLanguages);
 	const diffs = buildSectionDiffs(parsed, targetLanguages, overrides);
-	const rawBlocks = extractRawSections(text);
-	annotateDroppedComments(diffs, rawBlocks);
-	return { text, parsed, targetLanguages, diffs, rawBlocks };
+	return { text, parsed, targetLanguages, diffs };
 }
 
 function preservedPreambleBlock(preambleLines) {
@@ -173,7 +147,8 @@ function sectionBlock({ header, language, diffsByHeader, rawBlocks, overrides })
 	return fromFirstHeader(templateSectionText(language, overrides));
 }
 
-export function composeFixedContent({ text, parsed, diffs, targetLanguages, overrides, rawBlocks = extractRawSections(text) }) {
+export function composeFixedContent({ parsed, diffs, targetLanguages, overrides }) {
+	const { rawBlocks } = parsed;
 	const diffsByHeader = new Map(diffs.map((diff) => [diff.header, diff]));
 	const targets = new Set(targetLanguages);
 	const ordered = AVAILABLE_LANGUAGES.filter((name) => targets.has(name));
@@ -193,12 +168,10 @@ export function composeFixedContent({ text, parsed, diffs, targetLanguages, over
 
 function writeFixed(path, fix, overrides) {
 	writeFileAtomic(path, composeFixedContent({
-		text: fix.text,
 		parsed: fix.parsed,
 		diffs: fix.diffs,
 		targetLanguages: fix.targetLanguages,
 		overrides,
-		rawBlocks: fix.rawBlocks,
 	}));
 }
 

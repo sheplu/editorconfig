@@ -100,3 +100,16 @@ describe('parseSections — diagnostics', () => {
 	});
 });
 
+
+describe('parseSections — raw blocks', () => {
+	it('returns raw blocks in the same pass as the parsed sections', () => {
+		const { rawBlocks } = parseSections('root = true\n\n[*]\n# note\nindent_style = tab\n\n[*.md]\nindent_size = 2\n');
+		assert.equal(rawBlocks.get('[*]'), '[*]\n# note\nindent_style = tab');
+		assert.equal(rawBlocks.get('[*.md]'), '[*.md]\nindent_size = 2');
+	});
+
+	it('concatenates every copy of a duplicated header', () => {
+		const { rawBlocks } = parseSections('[*.py]\n# first\nindent_size = 4\n\n[*.py]\n# second\nindent_size = 2\n');
+		assert.equal(rawBlocks.get('[*.py]'), '[*.py]\n# first\nindent_size = 4\n\n[*.py]\n# second\nindent_size = 2');
+	});
+});

@@ -1,12 +1,9 @@
 import { pluralize, reportIsFailing, summarizeReport } from './check.js';
 
 function aggregateCounts(entries, strict) {
-	const totals = { matched: 0, failed: 0, unknown: 0, filesFailed: 0 };
+	const totals = { unknown: 0, filesFailed: 0 };
 	for (const entry of entries) {
-		const counts = summarizeReport(entry.report);
-		totals.matched += counts.matched;
-		totals.failed += counts.failed;
-		totals.unknown += counts.unknown;
+		totals.unknown += summarizeReport(entry.report).unknown;
 		if (reportIsFailing(entry.report, strict)) {
 			totals.filesFailed += 1;
 		}
