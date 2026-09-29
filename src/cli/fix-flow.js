@@ -147,7 +147,25 @@ function sectionBlock({ header, language, diffsByHeader, rawBlocks, overrides })
 	return fromFirstHeader(templateSectionText(language, overrides));
 }
 
-export function composeFixedContent({ parsed, diffs, targetLanguages, overrides }) {
+function countMatches(text, pattern) {
+	const matches = text.match(pattern);
+	if (matches === null) {
+		return 0;
+	}
+	return matches.length;
+}
+
+// The rewrite must not silently change the file's line endings: the dominant ending of the original wins.
+export function dominantLineEnding(text) {
+	const crlf = countMatches(text, /\r\n/gu);
+	const lf = countMatches(text, /(?<!\r)\n/gu);
+	if (crlf > lf) {
+		return '\r\n';
+	}
+	return '\n';
+}
+
+export function composeFixedContent({ parsed, diffs, targetLanguages, overrides, lineEnding = '\n' }) {
 	const { rawBlocks } = parsed;
 	const diffsByHeader = new Map(diffs.map((diff) => [diff.header, diff]));
 	const targets = new Set(targetLanguages);
@@ -163,7 +181,11 @@ export function composeFixedContent({ parsed, diffs, targetLanguages, overrides 
 			overrides,
 		})),
 	];
-	return joinSections(blocks);
+	const content = joinSections(blocks);
+	if (lineEnding === '\n') {
+		return content;
+	}
+	return content.replaceAll('\n', lineEnding);
 }
 
 function writeFixed(path, fix, overrides) {
@@ -172,6 +194,7 @@ function writeFixed(path, fix, overrides) {
 		diffs: fix.diffs,
 		targetLanguages: fix.targetLanguages,
 		overrides,
+		lineEnding: dominantLineEnding(fix.text),
 	}));
 }
 
