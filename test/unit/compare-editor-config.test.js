@@ -72,3 +72,22 @@ trim_trailing_whitespace = false
 		assert.equal(mdResult.status, 'match');
 	});
 });
+
+describe('compareEditorConfig — no-root and out-of-order coexist', () => {
+	it('reports both a missing root and a late [*] instead of only the first', () => {
+		const file = `root = false
+
+[*.md]
+indent_style = space
+indent_size = 2
+trim_trailing_whitespace = false
+
+[*]
+indent_style = tab
+`;
+		writeFileSync(state.target, file, 'utf8');
+		const report = compareEditorConfig(state.target, NO_LANGUAGE_FILTER);
+		assert.ok(report.baseIssues.some((issue) => issue.status === 'no-root'), 'the missing root must be reported');
+		assert.ok(report.baseIssues.some((issue) => issue.status === 'out-of-order'), 'the late [*] must also be reported');
+	});
+});
