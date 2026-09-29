@@ -94,11 +94,12 @@ function buildRootBaseIssues(parsed) {
 	const hasBase = parsed.sections.some((section) => section.header === BASE_SECTION_HEADER);
 	if (!hasBase) {
 		issues.push({ header: BASE_SECTION_HEADER, status: 'missing' });
+		return issues;
 	}
-	else if (!parsed.hasRoot) {
+	if (!parsed.hasRoot) {
 		issues.push({ header: BASE_SECTION_HEADER, status: 'no-root' });
 	}
-	else if (baseSectionOutOfOrder(parsed.sections)) {
+	if (baseSectionOutOfOrder(parsed.sections)) {
 		issues.push({ header: BASE_SECTION_HEADER, status: 'out-of-order' });
 	}
 	return issues;
