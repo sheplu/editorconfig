@@ -194,6 +194,15 @@ describe('buildSectionDiffs — superseded root declarations', () => {
 		assert.equal(diffs.some((diff) => diff.normalizedRoot), false);
 		assert.equal(hasChanges(diffs), false);
 	});
+
+	it('does not mistake an invalid line without = for a root declaration', () => {
+		const parsed = parseSections(`root = true\nroots\n\n[*]\n${BUILTIN_BASE_BODY}`);
+		const diffs = buildSectionDiffs(parsed, [], EMPTY_OVERRIDES);
+		const baseDiff = diffs.find((diff) => diff.header === '[*]');
+		assert.equal('normalizedRoot' in baseDiff, false, 'root = true must not be disclosed as superseded');
+		assert.equal('discardedRoots' in baseDiff, false);
+		assert.ok(diffs.some((diff) => diff.status === 'invalid'), 'the invalid line is still disclosed');
+	});
 });
 
 describe('buildSectionDiffs — unknown section itemization', () => {
