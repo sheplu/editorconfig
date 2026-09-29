@@ -143,6 +143,7 @@ What a fix does to the file:
 - Preamble comments are preserved above the (single) `root = true` line; stray `key = value` pairs sitting outside any section (which editors ignore) are removed and listed in the preview.
 - Unknown sections are removed, invalid lines are dropped, duplicated headers are consolidated into one canonical section, and sections are reordered to the canonical layout (`[*]` first) — all of it shown in the preview.
 - Comments inside a regenerated section cannot be kept; the preview lists each one as `- # … (comment will be removed)` before you confirm.
+- Line endings are preserved: a CRLF file is rewritten as CRLF, an LF file as LF.
 
 Safety: the preview is re-validated before writing — if the file changed while the confirmation prompt was open, the fix aborts with exit 1 instead of overwriting the concurrent edit. Writes are atomic (temp file + rename), so a failed write never destroys the previous configuration. Ctrl-D or Ctrl-C at the prompt cancels cleanly with exit 1.
 

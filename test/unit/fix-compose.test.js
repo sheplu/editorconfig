@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildSectionDiffs, composeFixedContent, formatDiff } from '../../src/cli/fix-flow.js';
+import { buildSectionDiffs, composeFixedContent, dominantLineEnding, formatDiff } from '../../src/cli/fix-flow.js';
 import { composeEditorConfig, EMPTY_OVERRIDES, parseSections } from '../../src/templates/index.js';
 import {
 	BUILTIN_BASE_BODY,
@@ -120,5 +120,43 @@ describe('composeFixedContent — duplicate headers', () => {
 		assert.equal(fixed.match(/^\[\*\.py\]$/gmu).length, 1);
 		assert.doesNotMatch(fixed, /bogus_key/u);
 		assert.match(fixed, /max_line_length = 88/u, 'the canonical python body must be emitted');
+	});
+});
+
+describe('dominantLineEnding', () => {
+	it('detects a CRLF file', () => {
+		assert.equal(dominantLineEnding('root = true\r\n\r\n[*]\r\n'), '\r\n');
+	});
+
+	it('detects an LF file', () => {
+		assert.equal(dominantLineEnding('root = true\n\n[*]\n'), '\n');
+	});
+
+	it('falls back to LF on a tie or a lone final CRLF', () => {
+		assert.equal(dominantLineEnding('root = true\n'), '\n');
+		assert.equal(dominantLineEnding('a\r\nb\n'), '\n');
+	});
+});
+
+describe('composeFixedContent — line endings', () => {
+	it('rewrites a drifted CRLF file with CRLF line endings', () => {
+		const lfText = `root = true\n\n[*]\n${BUILTIN_BASE_BODY}\n${PYTHON_SECTION}`;
+		const crlfText = lfText.replaceAll('\n', '\r\n').replace(
+			'indent_size = 4\r\n',
+			'indent_size = 2\r\n',
+		);
+		const parsed = parseSections(crlfText);
+		const targetLanguages = ['python'];
+		const diffs = buildSectionDiffs(parsed, targetLanguages, EMPTY_OVERRIDES);
+		const fixed = composeFixedContent({
+			parsed,
+			diffs,
+			targetLanguages,
+			overrides: EMPTY_OVERRIDES,
+			lineEnding: dominantLineEnding(crlfText),
+		});
+		assert.doesNotMatch(fixed, /(?<!\r)\n/u, 'every line break must be CRLF');
+		assert.match(fixed, /\r\n/u);
+		assert.match(fixed, /indent_size = 4\r\n/u, 'the drift is actually fixed');
 	});
 });
