@@ -148,6 +148,9 @@ function isStrayPairLine(line) {
 
 function pairFromLine(line) {
 	const equalsAt = line.indexOf('=');
+	if (equalsAt === -1) {
+		return { key: '', value: '' };
+	}
 	return { key: line.slice(0, equalsAt).trim().toLowerCase(), value: line.slice(equalsAt + 1).trim() };
 }
 
