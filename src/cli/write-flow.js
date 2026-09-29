@@ -11,7 +11,7 @@ import { ask, CANCELLED, isYes } from './prompt.js';
 
 export function createEditorConfig(path = '.editorconfig', languages = [], overrides = EMPTY_OVERRIDES) {
 	writeFileAtomic(path, composeEditorConfig(languages, overrides));
-};
+}
 
 function resolveToken(token) {
 	// Only a full-integer token is an index — '1garbage' or '1.5' must not silently select language 1.
