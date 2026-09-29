@@ -1,8 +1,11 @@
-import { accessSync, chmodSync, constants, existsSync, lstatSync, readlinkSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { accessSync, chmodSync, closeSync, constants, existsSync, fsyncSync, lstatSync, openSync, readdirSync, readlinkSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 
 const MAX_LINK_DEPTH = 40;
+
+// A crashed process never cleans up its temp file; the next write sweeps siblings older than one hour.
+const STALE_TEMP_MS = 3_600_000;
 
 // Octal span of the permission bits: st_mode % MODE_PERMISSION_SPAN strips the file-type bits.
 // POSIX leaves chmod's treatment of the non-permission bits unspecified.
@@ -55,6 +58,34 @@ function tempPathFor(target) {
 	return join(dirname(target), `.${basename(target)}.tmp-${process.pid}-${randomUUID()}`);
 }
 
+function staleTempCandidates(dir, prefix) {
+	try {
+		return readdirSync(dir).filter((entry) => entry.startsWith(prefix));
+	}
+	catch {
+		return [];
+	}
+}
+
+function removeIfStale(candidate) {
+	try {
+		if (statSync(candidate).isFile() && Date.now() - statSync(candidate).mtimeMs > STALE_TEMP_MS) {
+			rmSync(candidate, { force: true });
+		}
+	}
+	catch {
+		// Already gone, or a concurrent writer replaced it — nothing to do.
+	}
+}
+
+function removeStaleTemps(target) {
+	const dir = dirname(target);
+	const prefix = `.${basename(target)}.tmp-`;
+	for (const entry of staleTempCandidates(dir, prefix)) {
+		removeIfStale(join(dir, entry));
+	}
+}
+
 function createTemp(target, content) {
 	for (;;) {
 		const temp = tempPathFor(target);
@@ -72,6 +103,44 @@ function createTemp(target, content) {
 	}
 }
 
+// Flush the temp file's data before the rename so a power loss cannot publish a truncated replacement.
+function syncFile(path) {
+	const fd = openSync(path, 'r+');
+	try {
+		fsyncSync(fd);
+	}
+	finally {
+		closeSync(fd);
+	}
+}
+
+// Persist the directory entry itself, best effort: opening a directory fails on Windows, and some systems lack directory fsync.
+function syncDir(path) {
+	try {
+		const fd = openSync(path, 'r');
+		try {
+			fsyncSync(fd);
+		}
+		finally {
+			closeSync(fd);
+		}
+	}
+	catch {
+		// The rename is still crash-safe at the process level without the directory sync.
+	}
+}
+
+function applyPermissionsAndRename(temp, target) {
+	// Flush before restoring the destination mode: an owner-write-only destination would break an fsync through the restored mode.
+	syncFile(temp);
+	if (existsSync(target)) {
+		// Creation applies the process umask, so restore the destination's permissions before the rename.
+		chmodSync(temp, statSync(target).mode % MODE_PERMISSION_SPAN);
+	}
+	renameSync(temp, target);
+	syncDir(dirname(target));
+}
+
 // A truncating write that fails midway destroys the previous content.
 // Write to a sibling temp file and rename, so the original survives failures.
 export function writeFileAtomic(path, content) {
@@ -80,13 +149,10 @@ export function writeFileAtomic(path, content) {
 		// Renaming only needs directory permission; refuse write-protected targets like plain writeFileSync does.
 		accessSync(target, constants.W_OK);
 	}
+	removeStaleTemps(target);
 	const temp = createTemp(target, content);
 	try {
-		if (existsSync(target)) {
-			// Creation applies the process umask, so restore the destination's permissions before the rename.
-			chmodSync(temp, statSync(target).mode % MODE_PERMISSION_SPAN);
-		}
-		renameSync(temp, target);
+		applyPermissionsAndRename(temp, target);
 	}
 	catch (error) {
 		rmSync(temp, { force: true });

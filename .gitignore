@@ -149,3 +149,6 @@ vite.config.ts.timestamp-*
 # Terminal recordings and demo videos
 *.cast
 *.mp4
+
+# Temp files of the CLI's own atomic writes (a crash can leave one behind)
+..editorconfig.tmp-*

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
 	chmodSync,
+	existsSync,
 	lstatSync,
 	mkdtempSync,
 	readdirSync,
@@ -10,6 +11,7 @@ import {
 	rmSync,
 	statSync,
 	symlinkSync,
+	utimesSync,
 	writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -137,5 +139,39 @@ describe('writeFileAtomic — write-protected target', () => {
 		chmodSync(state.target, 0o644);
 		assert.equal(readFileSync(state.target, 'utf8'), 'locked content\n');
 		assert.deepEqual(readdirSync(state.workdir), ['.editorconfig'], 'no temp file may remain');
+	});
+});
+
+describe('writeFileAtomic — stale temp cleanup', () => {
+	it('sweeps a leftover temp file from a previous crashed write', () => {
+		writeFileSync(state.target, 'original\n', 'utf8');
+		const stale = join(state.workdir, '..editorconfig.tmp-12345-deadbeef');
+		writeFileSync(stale, 'leftover\n', 'utf8');
+		const old = new Date(Date.now() - 2 * 3_600_000);
+		utimesSync(stale, old, old);
+		writeFileAtomic(state.target, 'new\n');
+		assert.equal(existsSync(stale), false, 'the stale temp must be swept');
+		assert.equal(readFileSync(state.target, 'utf8'), 'new\n');
+	});
+
+	it('keeps a fresh temp file that a concurrent writer may still rename', () => {
+		writeFileSync(state.target, 'original\n', 'utf8');
+		const fresh = join(state.workdir, '..editorconfig.tmp-99999-in-flight');
+		writeFileSync(fresh, 'in flight\n', 'utf8');
+		writeFileAtomic(state.target, 'new\n');
+		assert.equal(existsSync(fresh), true, 'a fresh temp file must not be swept');
+	});
+
+	it('sweeps stale temps of the same basename but leaves other files alone', () => {
+		const stale = join(state.workdir, '..editorconfig.tmp-12345-deadbeef');
+		const other = join(state.workdir, '.otherrc.tmp-12345-deadbeef');
+		writeFileSync(stale, 'leftover\n', 'utf8');
+		writeFileSync(other, 'not mine\n', 'utf8');
+		const old = new Date(Date.now() - 2 * 3_600_000);
+		utimesSync(stale, old, old);
+		utimesSync(other, old, old);
+		writeFileAtomic(state.target, 'new\n');
+		assert.equal(existsSync(stale), false);
+		assert.equal(existsSync(other), true, 'temp files of other basenames are untouched');
 	});
 });

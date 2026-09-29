@@ -145,7 +145,7 @@ What a fix does to the file:
 - Comments inside a regenerated section cannot be kept; the preview lists each one as `- # … (comment will be removed)` before you confirm.
 - Line endings are preserved: a CRLF file is rewritten as CRLF, an LF file as LF.
 
-Safety: the preview is re-validated before writing — if the file changed while the confirmation prompt was open, the fix aborts with exit 1 instead of overwriting the concurrent edit. Writes are atomic (temp file + rename), so a failed write never destroys the previous configuration. Ctrl-D or Ctrl-C at the prompt cancels cleanly with exit 1.
+Safety: the preview is re-validated before writing — if the file changed while the confirmation prompt was open, the fix aborts with exit 1 instead of overwriting the concurrent edit. Writes are atomic (temp file + rename, flushed before the rename), so a failed write never destroys the previous configuration. Ctrl-D or Ctrl-C at the prompt cancels cleanly with exit 1.
 
 ### `--recursive` (monorepo check)
 
